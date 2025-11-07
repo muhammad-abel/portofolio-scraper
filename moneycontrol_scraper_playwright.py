@@ -30,18 +30,71 @@ logger = logging.getLogger(__name__)
 class MoneyControlPlaywrightScraper:
     """Async scraper using Playwright"""
 
-    def __init__(self, base_url: str = "https://www.moneycontrol.com/news/business/markets/", headless: bool = True):
+    def __init__(self, base_url: str = "https://www.moneycontrol.com/news/business/markets/", headless: bool = True, fetch_details: bool = True):
         """
         Initialize the Playwright scraper
 
         Args:
             base_url: Base URL for the markets section
             headless: Run browser in headless mode
+            fetch_details: If True, fetch date & author from detail pages
         """
         self.base_url = base_url
         self.headless = headless
+        self.fetch_details = fetch_details
         self.browser: Optional[Browser] = None
         self.playwright = None
+
+    async def fetch_article_details(self, url: str) -> Dict[str, str]:
+        """
+        Fetch date and author from article detail page
+
+        Args:
+            url: URL of the article
+
+        Returns:
+            Dictionary with date and author
+        """
+        try:
+            logger.info(f"Fetching details from: {url}")
+
+            # Create a new page
+            page = await self.browser.new_page()
+
+            # Navigate to the article page
+            await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            await page.wait_for_selector('body', timeout=10000)
+
+            # Get page content
+            content = await page.content()
+            soup = BeautifulSoup(content, 'lxml')
+
+            # Extract author from <div class="article_author"> <a>
+            author = ''
+            author_elem = soup.find('div', class_='article_author')
+            if author_elem:
+                author_link = author_elem.find('a')
+                author = author_link.get_text(strip=True) if author_link else ''
+
+            # Extract date from <div class="article_schedule"> <span>
+            date = ''
+            date_elem = soup.find('div', class_='article_schedule')
+            if date_elem:
+                date_span = date_elem.find('span')
+                if date_span:
+                    date_text = date_span.get_text(strip=True)
+                    # Extract just the date part (before '/')
+                    date = date_text.split('/')[0].strip() if '/' in date_text else date_text
+
+            # Close the page
+            await page.close()
+
+            logger.debug(f"Extracted from {url}: author={author}, date={date}")
+            return {'date': date, 'author': author}
+
+        except Exception as e:
+            logger.error(f"Error fetching details from {url}: {str(e)}")
+            return {'date': '', 'author': ''}
 
     async def initialize(self):
         """Initialize Playwright browser"""
@@ -197,6 +250,25 @@ class MoneyControlPlaywrightScraper:
 
             # Close the page
             await page.close()
+
+            # Fetch details (date & author) from each article page
+            if self.fetch_details and articles:
+                logger.info(f"Fetching details for {len(articles)} articles...")
+
+                # Fetch details for all articles in parallel
+                detail_tasks = [
+                    self.fetch_article_details(article['url'])
+                    for article in articles
+                ]
+
+                details = await asyncio.gather(*detail_tasks)
+
+                # Update articles with fetched details
+                for article, detail in zip(articles, details):
+                    article['date'] = detail['date']
+                    article['author'] = detail['author']
+
+                logger.info(f"Successfully fetched details for {len(articles)} articles")
 
         except Exception as e:
             logger.error(f"Error scraping page {page_number}: {str(e)}")
