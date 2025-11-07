@@ -9,7 +9,8 @@ Web scraper untuk mengekstrak berita dari Moneycontrol.com bagian Markets (https
 - ✅ Export ke JSON, CSV, dan Excel
 - ✅ Rate limiting dan retry mechanism
 - ✅ Comprehensive logging
-- ✅ Dua mode: Regular (requests) dan Selenium (untuk JavaScript content)
+- ✅ Tiga mode scraper: Regular (requests), Crawl4AI (modern & powerful), dan Playwright (async & reliable)
+- ✅ Async/await support untuk performa maksimal
 
 ## Instalasi
 
@@ -32,26 +33,55 @@ venv\Scripts\activate  # Windows
 pip install -r requirements.txt
 ```
 
-### 4. Install Chrome/Chromium (untuk Selenium scraper)
-Jika menggunakan `moneycontrol_scraper_selenium.py`, pastikan Chrome atau Chromium terinstall.
+### 4. Install Playwright browsers (untuk Crawl4AI & Playwright scraper)
+```bash
+playwright install chromium
+```
+
+**Catatan:** Chrome/Chromium akan otomatis di-download oleh Playwright.
 
 ## Cara Penggunaan
 
-### Mode 1: Regular Scraper (Recommended)
+### Mode 1: Crawl4AI Scraper (RECOMMENDED! 🚀)
 
-Scraper ini menggunakan `requests` dan `BeautifulSoup` - lebih cepat dan ringan:
+Scraper modern menggunakan Crawl4AI - paling powerful dan otomatis handle JavaScript:
+
+```bash
+python moneycontrol_scraper_crawl4ai.py
+```
+
+**Keunggulan:**
+- Built khusus untuk AI/LLM extraction
+- Otomatis handle JavaScript
+- Async untuk performa tinggi
+- Smart content extraction
+
+### Mode 2: Playwright Scraper (Control Penuh)
+
+Gunakan Playwright untuk kontrol maksimal atas browser:
+
+```bash
+python moneycontrol_scraper_playwright.py
+```
+
+**Keunggulan:**
+- Full browser automation
+- Reliable dan stabil
+- Async/await support
+- Debugging yang mudah
+
+### Mode 3: Regular Scraper (Ringan & Cepat)
+
+Scraper basic menggunakan `requests` dan `BeautifulSoup`:
 
 ```bash
 python moneycontrol_scraper.py
 ```
 
-### Mode 2: Selenium Scraper
-
-Gunakan jika website memerlukan JavaScript rendering:
-
-```bash
-python moneycontrol_scraper_selenium.py
-```
+**Keunggulan:**
+- Paling ringan dan cepat
+- Tidak perlu browser
+- Cocok untuk static content
 
 ### Kustomisasi
 
@@ -108,18 +138,25 @@ Setiap artikel memiliki field berikut:
 
 ### Error: Connection refused
 - Cek koneksi internet
-- Website mungkin memblokir request - coba gunakan Selenium scraper
+- Website mungkin memblokir request - coba gunakan Crawl4AI atau Playwright scraper
 - Tambah delay antar request di `config.py`
 
 ### Error: No articles found
 - Website mungkin mengubah struktur HTML
 - Periksa log file untuk detail
-- Coba Selenium scraper sebagai alternatif
+- Coba Crawl4AI scraper sebagai alternatif (paling powerful)
 
-### Error: ChromeDriver
+### Error: Playwright browser tidak tersedia
 ```bash
-# Install webdriver-manager akan otomatis download ChromeDriver
-pip install webdriver-manager --upgrade
+# Install Playwright browsers
+playwright install chromium
+```
+
+### Error: Crawl4AI installation
+```bash
+# Update pip dan install ulang
+pip install --upgrade pip
+pip install crawl4ai --upgrade
 ```
 
 ## Best Practices
@@ -154,7 +191,8 @@ python moneycontrol_scraper.py --pages 1
 - requests
 - beautifulsoup4
 - pandas
-- selenium (opsional, untuk Selenium scraper)
+- crawl4ai (untuk Crawl4AI scraper - RECOMMENDED)
+- playwright (untuk Playwright dan Crawl4AI scraper)
 
 ## License
 
