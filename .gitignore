@@ -58,3 +58,4 @@ Thumbs.db
 chromedriver
 geckodriver
 *.crx
+*.jsonl
