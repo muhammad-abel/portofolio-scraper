@@ -53,30 +53,40 @@ class MoneyControlCrawl4AIScraper:
         try:
             article_data = {}
 
-            # Extract title and link
-            title_elem = article_element.find('h2') or article_element.find('a')
-            if title_elem:
-                link_elem = title_elem.find('a') if title_elem.name != 'a' else title_elem
-                if link_elem:
-                    article_data['title'] = link_elem.get_text(strip=True)
-                    article_data['url'] = urljoin(self.base_url, link_elem.get('href', ''))
+            # Extract link first (struktur: <li> -> <a href="URL" class="unified-link">)
+            link_elem = article_element.find('a', class_='unified-link') or article_element.find('a')
+
+            if link_elem:
+                # Get URL from <a href="">
+                href = link_elem.get('href', '')
+                article_data['url'] = href if href.startswith('http') else urljoin(self.base_url, href)
+
+                # Get title from <h2> inside <a>
+                title_elem = link_elem.find('h2')
+                article_data['title'] = title_elem.get_text(strip=True) if title_elem else ''
+
+                # Get image from <img> inside <a>
+                img_elem = link_elem.find('img')
+                if img_elem:
+                    # Try 'src' first, then 'data-src' for lazy loading
+                    article_data['image_url'] = img_elem.get('src') or img_elem.get('data-src') or img_elem.get('data', '')
                 else:
-                    article_data['title'] = title_elem.get_text(strip=True)
-                    article_data['url'] = ''
+                    article_data['image_url'] = ''
+            else:
+                # Fallback jika struktur berbeda
+                article_data['url'] = ''
+                article_data['title'] = ''
+                article_data['image_url'] = ''
+
+            # Extract summary from <p> (outside <a>, sibling of <a>)
+            summary_elem = article_element.find('p')
+            article_data['summary'] = summary_elem.get_text(strip=True) if summary_elem else ''
 
             # Extract date
             date_elem = article_element.find('span', class_='article-time') or \
                        article_element.find('time') or \
                        article_element.find('span', class_='date')
             article_data['date'] = date_elem.get_text(strip=True) if date_elem else ''
-
-            # Extract summary/description
-            summary_elem = article_element.find('p') or article_element.find('div', class_='article-desc')
-            article_data['summary'] = summary_elem.get_text(strip=True) if summary_elem else ''
-
-            # Extract image
-            img_elem = article_element.find('img')
-            article_data['image_url'] = img_elem.get('src', '') if img_elem else ''
 
             # Extract author if available
             author_elem = article_element.find('span', class_='author') or \
@@ -86,8 +96,8 @@ class MoneyControlCrawl4AIScraper:
             # Add metadata
             article_data['scraped_at'] = datetime.now().isoformat()
 
-            # Only return if we have at least a title
-            if article_data.get('title'):
+            # Only return if we have at least a title and URL
+            if article_data.get('title') and article_data.get('url'):
                 return article_data
             return None
 

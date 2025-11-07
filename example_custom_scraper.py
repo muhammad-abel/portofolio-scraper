@@ -33,30 +33,40 @@ class CustomScraper:
         data = {}
 
         # ========================================
-        # CONTOH 1: Extract dari News Article
+        # CONTOH 1: Extract dari Moneycontrol News
+        # Struktur: <li> -> <a class="unified-link" href="URL"> -> <h2>Title</h2>
         # ========================================
-        # Cari judul - ubah selector sesuai website Anda
-        title_elem = container_element.find('h2')  # atau h1, h3, dll
-        if title_elem:
-            # Jika judul ada di dalam <a>
-            link_elem = title_elem.find('a')
-            if link_elem:
-                data['title'] = link_elem.get_text(strip=True)
-                data['url'] = link_elem.get('href', '')
-            else:
-                data['title'] = title_elem.get_text(strip=True)
 
-        # Cari tanggal - ubah class/tag sesuai website
+        # Cari link element dulu (biasanya membungkus konten)
+        link_elem = container_element.find('a', class_='unified-link') or container_element.find('a')
+
+        if link_elem:
+            # Get URL dari <a href="">
+            href = link_elem.get('href', '')
+            data['url'] = href if href.startswith('http') else f"https://example.com{href}"
+
+            # Get title dari <h2> di DALAM <a>
+            title_elem = link_elem.find('h2')  # atau h1, h3 sesuai website
+            data['title'] = title_elem.get_text(strip=True) if title_elem else ''
+
+            # Get image dari <img> di DALAM <a>
+            img_elem = link_elem.find('img')
+            if img_elem:
+                data['image'] = img_elem.get('src') or img_elem.get('data-src', '')
+            else:
+                data['image'] = ''
+        else:
+            data['url'] = ''
+            data['title'] = ''
+            data['image'] = ''
+
+        # Cari tanggal - biasanya di luar <a>
         date_elem = container_element.find('span', class_='date')  # atau time, div, dll
         data['date'] = date_elem.get_text(strip=True) if date_elem else ''
 
-        # Cari deskripsi/ringkasan
-        desc_elem = container_element.find('p', class_='description')  # atau tanpa class
+        # Cari deskripsi/ringkasan - biasanya di luar <a>
+        desc_elem = container_element.find('p')  # atau dengan class tertentu
         data['description'] = desc_elem.get_text(strip=True) if desc_elem else ''
-
-        # Cari gambar
-        img_elem = container_element.find('img')
-        data['image'] = img_elem.get('src', '') if img_elem else ''
 
         # ========================================
         # CONTOH 2: Extract dari Product Listing
