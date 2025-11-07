@@ -97,18 +97,18 @@ class MoneyControlCrawl4AIScraper:
                         # Extract just the date part (before '/')
                         date = date_text.split('/')[0].strip() if '/' in date_text else date_text
 
-                logger.debug(f"✅ Extracted from {url}: author={author}, date={date}")
+                logger.debug(f"[SUCCESS] Extracted from {url}: author={author}, date={date}")
                 return {'date': date, 'author': author}
 
             except asyncio.TimeoutError:
-                logger.error(f"⏱️ Timeout fetching {url} (attempt {attempt + 1}/{retries})")
+                logger.error(f"[TIMEOUT] Timeout fetching {url} (attempt {attempt + 1}/{retries})")
                 if attempt < retries - 1:
                     await asyncio.sleep(2 ** attempt)
                     continue
                 return {'date': '', 'author': ''}
 
             except Exception as e:
-                logger.error(f"❌ Error fetching details from {url} (attempt {attempt + 1}/{retries}): {str(e)}")
+                logger.error(f"[ERROR] Error fetching details from {url} (attempt {attempt + 1}/{retries}): {str(e)}")
                 if attempt < retries - 1:
                     await asyncio.sleep(2 ** attempt)
                     continue
@@ -264,7 +264,7 @@ class MoneyControlCrawl4AIScraper:
                             article['author'] = ''
                             logger.warning(f"Failed to fetch details for: {article['url']}")
 
-                    logger.info(f"✅ Successfully fetched details for {success_count}/{len(articles)} articles")
+                    logger.info(f"[SUCCESS] Successfully fetched details for {success_count}/{len(articles)} articles")
 
         except Exception as e:
             logger.error(f"Error scraping page {page_number}: {str(e)}")
