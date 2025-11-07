@@ -30,14 +30,16 @@ logger = logging.getLogger(__name__)
 class MoneyControlScraper:
     """Scraper for Moneycontrol news articles"""
 
-    def __init__(self, base_url: str = "https://www.moneycontrol.com/news/business/markets/"):
+    def __init__(self, base_url: str = "https://www.moneycontrol.com/news/business/markets/", fetch_details: bool = True):
         """
         Initialize the scraper
 
         Args:
             base_url: Base URL for the markets section
+            fetch_details: If True, fetch date & author from detail pages
         """
         self.base_url = base_url
+        self.fetch_details = fetch_details
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -47,6 +49,52 @@ class MoneyControlScraper:
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1'
         })
+
+    def fetch_article_details(self, url: str, retries: int = 2) -> Dict[str, str]:
+        """
+        Fetch date and author from article detail page
+
+        Args:
+            url: URL of the article
+            retries: Number of retries on failure
+
+        Returns:
+            Dictionary with date and author
+        """
+        for attempt in range(retries):
+            try:
+                logger.info(f"Fetching details from: {url}")
+                response = self.session.get(url, timeout=15)
+                response.raise_for_status()
+
+                soup = BeautifulSoup(response.content, 'lxml')
+
+                # Extract author from <div class="article_author"> <a>
+                author = ''
+                author_elem = soup.find('div', class_='article_author')
+                if author_elem:
+                    author_link = author_elem.find('a')
+                    author = author_link.get_text(strip=True) if author_link else ''
+
+                # Extract date from <div class="article_schedule"> <span>
+                date = ''
+                date_elem = soup.find('div', class_='article_schedule')
+                if date_elem:
+                    date_span = date_elem.find('span')
+                    if date_span:
+                        date_text = date_span.get_text(strip=True)
+                        # Extract just the date part (before '/')
+                        date = date_text.split('/')[0].strip() if '/' in date_text else date_text
+
+                logger.debug(f"Extracted from {url}: author={author}, date={date}")
+                return {'date': date, 'author': author}
+
+            except requests.RequestException as e:
+                logger.error(f"Error fetching details from {url} (attempt {attempt + 1}/{retries}): {str(e)}")
+                if attempt < retries - 1:
+                    time.sleep(1)
+                else:
+                    return {'date': '', 'author': ''}
 
     def fetch_page(self, page_number: int = 1, retries: int = 3) -> Optional[BeautifulSoup]:
         """
@@ -179,6 +227,22 @@ class MoneyControlScraper:
                 logger.debug(f"Extracted article {idx}: {article_data.get('title', 'No title')[:50]}")
 
         logger.info(f"Successfully extracted {len(articles)} articles from page {page_number}")
+
+        # Fetch details (date & author) from each article page
+        if self.fetch_details and articles:
+            logger.info(f"Fetching details for {len(articles)} articles...")
+
+            for idx, article in enumerate(articles, 1):
+                details = self.fetch_article_details(article['url'])
+                article['date'] = details['date']
+                article['author'] = details['author']
+
+                # Small delay between requests to be polite
+                if idx < len(articles):
+                    time.sleep(0.5)
+
+            logger.info(f"Successfully fetched details for {len(articles)} articles")
+
         return articles
 
     def scrape_multiple_pages(self, num_pages: int = 1, delay: float = 2.0) -> List[Dict]:
