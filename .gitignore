@@ -39,7 +39,7 @@ scraper.log
 scraper_selenium.log
 
 # Output files
-*.json
+# *.json
 !sample_*.json
 !*example*.json
 *.csv
