@@ -31,67 +31,88 @@ logger = logging.getLogger(__name__)
 class MoneyControlCrawl4AIScraper:
     """Modern async scraper using Crawl4AI"""
 
-    def __init__(self, base_url: str = "https://www.moneycontrol.com/news/business/markets/", fetch_details: bool = True):
+    def __init__(self, base_url: str = "https://www.moneycontrol.com/news/business/markets/", fetch_details: bool = True, max_concurrent: int = 5):
         """
         Initialize the Crawl4AI scraper
 
         Args:
             base_url: Base URL for the markets section
             fetch_details: If True, fetch date & author from detail pages
+            max_concurrent: Maximum concurrent detail page requests (default: 5)
         """
         self.base_url = base_url
         self.fetch_details = fetch_details
+        self.max_concurrent = max_concurrent  # Limit concurrent requests
 
-    async def fetch_article_details(self, url: str, crawler: AsyncWebCrawler) -> Dict[str, str]:
+    async def fetch_article_details(self, url: str, crawler: AsyncWebCrawler, retries: int = 2) -> Dict[str, str]:
         """
-        Fetch date and author from article detail page
+        Fetch date and author from article detail page with retry
 
         Args:
             url: URL of the article
             crawler: AsyncWebCrawler instance
+            retries: Number of retries on failure
 
         Returns:
             Dictionary with date and author
         """
-        try:
-            logger.info(f"Fetching details from: {url}")
+        for attempt in range(retries):
+            try:
+                logger.info(f"Fetching details from: {url} (attempt {attempt + 1}/{retries})")
 
-            result = await crawler.arun(
-                url=url,
-                word_count_threshold=10,
-                bypass_cache=True,
-                wait_for="body"
-            )
+                result = await crawler.arun(
+                    url=url,
+                    word_count_threshold=10,
+                    bypass_cache=True,
+                    wait_for="body",
+                    page_timeout=120000,  # Increase timeout to 120 seconds
+                    delay_before_return_html=1.0  # Wait 1s before extracting
+                )
 
-            if not result.success:
-                logger.error(f"Failed to fetch details from {url}")
+                if not result.success:
+                    logger.error(f"Failed to fetch details from {url}: {result.error_message}")
+                    if attempt < retries - 1:
+                        wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    return {'date': '', 'author': ''}
+
+                soup = BeautifulSoup(result.html, 'lxml')
+
+                # Extract author from <div class="article_author"> <a>
+                author = ''
+                author_elem = soup.find('div', class_='article_author')
+                if author_elem:
+                    author_link = author_elem.find('a')
+                    author = author_link.get_text(strip=True) if author_link else ''
+
+                # Extract date from <div class="article_schedule"> <span>
+                date = ''
+                date_elem = soup.find('div', class_='article_schedule')
+                if date_elem:
+                    date_span = date_elem.find('span')
+                    if date_span:
+                        date_text = date_span.get_text(strip=True)
+                        # Extract just the date part (before '/')
+                        date = date_text.split('/')[0].strip() if '/' in date_text else date_text
+
+                logger.debug(f"✅ Extracted from {url}: author={author}, date={date}")
+                return {'date': date, 'author': author}
+
+            except asyncio.TimeoutError:
+                logger.error(f"⏱️ Timeout fetching {url} (attempt {attempt + 1}/{retries})")
+                if attempt < retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
                 return {'date': '', 'author': ''}
 
-            soup = BeautifulSoup(result.html, 'lxml')
-
-            # Extract author from <div class="article_author"> <a>
-            author = ''
-            author_elem = soup.find('div', class_='article_author')
-            if author_elem:
-                author_link = author_elem.find('a')
-                author = author_link.get_text(strip=True) if author_link else ''
-
-            # Extract date from <div class="article_schedule"> <span>
-            date = ''
-            date_elem = soup.find('div', class_='article_schedule')
-            if date_elem:
-                date_span = date_elem.find('span')
-                if date_span:
-                    date_text = date_span.get_text(strip=True)
-                    # Extract just the date part (before '/')
-                    date = date_text.split('/')[0].strip() if '/' in date_text else date_text
-
-            logger.debug(f"Extracted from {url}: author={author}, date={date}")
-            return {'date': date, 'author': author}
-
-        except Exception as e:
-            logger.error(f"Error fetching details from {url}: {str(e)}")
-            return {'date': '', 'author': ''}
+            except Exception as e:
+                logger.error(f"❌ Error fetching details from {url} (attempt {attempt + 1}/{retries}): {str(e)}")
+                if attempt < retries - 1:
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                return {'date': '', 'author': ''}
 
     def extract_article_data(self, article_element) -> Optional[Dict]:
         """
@@ -213,22 +234,37 @@ class MoneyControlCrawl4AIScraper:
 
                 # Fetch details (date & author) from each article page
                 if self.fetch_details and articles:
-                    logger.info(f"Fetching details for {len(articles)} articles...")
+                    logger.info(f"Fetching details for {len(articles)} articles (max {self.max_concurrent} concurrent)...")
 
-                    # Fetch details for all articles in parallel
-                    detail_tasks = [
-                        self.fetch_article_details(article['url'], crawler)
-                        for article in articles
-                    ]
+                    # Fetch details with concurrency limit using semaphore
+                    semaphore = asyncio.Semaphore(self.max_concurrent)
 
-                    details = await asyncio.gather(*detail_tasks)
+                    async def fetch_with_semaphore(article):
+                        async with semaphore:
+                            detail = await self.fetch_article_details(article['url'], crawler)
+                            # Small random delay to avoid detection
+                            await asyncio.sleep(0.5 + (hash(article['url']) % 10) / 10)  # 0.5-1.5s
+                            return detail
+
+                    # Fetch details for all articles with limited concurrency
+                    detail_tasks = [fetch_with_semaphore(article) for article in articles]
+                    details = await asyncio.gather(*detail_tasks, return_exceptions=True)
 
                     # Update articles with fetched details
+                    success_count = 0
                     for article, detail in zip(articles, details):
-                        article['date'] = detail['date']
-                        article['author'] = detail['author']
+                        if isinstance(detail, dict):
+                            article['date'] = detail.get('date', '')
+                            article['author'] = detail.get('author', '')
+                            if detail.get('date') or detail.get('author'):
+                                success_count += 1
+                        else:
+                            # Exception occurred
+                            article['date'] = ''
+                            article['author'] = ''
+                            logger.warning(f"Failed to fetch details for: {article['url']}")
 
-                    logger.info(f"Successfully fetched details for {len(articles)} articles")
+                    logger.info(f"✅ Successfully fetched details for {success_count}/{len(articles)} articles")
 
         except Exception as e:
             logger.error(f"Error scraping page {page_number}: {str(e)}")
@@ -291,12 +327,15 @@ class MoneyControlCrawl4AIScraper:
 
 async def main():
     """Main execution function"""
-    # Initialize scraper
-    scraper = MoneyControlCrawl4AIScraper()
+    # Initialize scraper with concurrency limit
+    scraper = MoneyControlCrawl4AIScraper(
+        fetch_details=True,
+        max_concurrent=5  # Max 5 concurrent detail page requests (adjust as needed)
+    )
 
     # Scrape first 3 pages (you can adjust this)
     num_pages = 3
-    logger.info(f"Starting Crawl4AI scraper for {num_pages} pages...")
+    logger.info(f"Starting Crawl4AI scraper for {num_pages} pages with max {scraper.max_concurrent} concurrent requests...")
 
     articles = await scraper.scrape_multiple_pages(num_pages=num_pages, delay=2.0)
 
