@@ -40,6 +40,8 @@ scraper_selenium.log
 
 # Output files
 *.json
+!sample_*.json
+!*example*.json
 *.csv
 *.xlsx
 *.xls
