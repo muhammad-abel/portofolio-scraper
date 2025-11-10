@@ -5,6 +5,7 @@ Modern async scraper using Crawl4AI - the most powerful choice!
 """
 
 import asyncio
+import os
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from bs4 import BeautifulSoup
@@ -473,5 +474,4 @@ Examples:
 
 if __name__ == "__main__":
     # Run the async main function
-    import os
     asyncio.run(main())
