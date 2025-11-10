@@ -14,6 +14,7 @@ import logging
 from datetime import datetime
 from typing import List, Dict, Optional
 import sys
+import argparse
 from urllib.parse import urljoin
 
 # Configure logging
@@ -46,7 +47,7 @@ class MoneyControlCrawl4AIScraper:
 
     async def fetch_article_details(self, url: str, crawler: AsyncWebCrawler, retries: int = 2) -> Dict[str, str]:
         """
-        Fetch date and author from article detail page with retry
+        Fetch date, author, and full content from article detail page with retry
 
         Args:
             url: URL of the article
@@ -54,7 +55,7 @@ class MoneyControlCrawl4AIScraper:
             retries: Number of retries on failure
 
         Returns:
-            Dictionary with date and author
+            Dictionary with date, author, and full_content
         """
         for attempt in range(retries):
             try:
@@ -76,7 +77,7 @@ class MoneyControlCrawl4AIScraper:
                         logger.info(f"Retrying in {wait_time} seconds...")
                         await asyncio.sleep(wait_time)
                         continue
-                    return {'date': '', 'author': ''}
+                    return {'date': '', 'author': '', 'full_content': ''}
 
                 soup = BeautifulSoup(result.html, 'lxml')
 
@@ -97,22 +98,35 @@ class MoneyControlCrawl4AIScraper:
                         # Extract just the date part (before '/')
                         date = date_text.split('/')[0].strip() if '/' in date_text else date_text
 
-                logger.debug(f"[SUCCESS] Extracted from {url}: author={author}, date={date}")
-                return {'date': date, 'author': author}
+                # Extract full content from <div class="content_wrapper arti-flow" id="contentdata">
+                full_content = ''
+                content_wrapper = soup.find('div', {'class': 'content_wrapper arti-flow', 'id': 'contentdata'})
+                if content_wrapper:
+                    # Get all <p> tags inside content_wrapper
+                    paragraphs = content_wrapper.find_all('p')
+                    # Join all paragraph texts with newlines
+                    full_content = '\n\n'.join([p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)])
+
+                if full_content:
+                    logger.debug(f"[SUCCESS] Extracted from {url}: author={author}, date={date}, content_length={len(full_content)}")
+                else:
+                    logger.debug(f"[SUCCESS] Extracted from {url}: author={author}, date={date} (no full_content found)")
+
+                return {'date': date, 'author': author, 'full_content': full_content}
 
             except asyncio.TimeoutError:
                 logger.error(f"[TIMEOUT] Timeout fetching {url} (attempt {attempt + 1}/{retries})")
                 if attempt < retries - 1:
                     await asyncio.sleep(2 ** attempt)
                     continue
-                return {'date': '', 'author': ''}
+                return {'date': '', 'author': '', 'full_content': ''}
 
             except Exception as e:
                 logger.error(f"[ERROR] Error fetching details from {url} (attempt {attempt + 1}/{retries}): {str(e)}")
                 if attempt < retries - 1:
                     await asyncio.sleep(2 ** attempt)
                     continue
-                return {'date': '', 'author': ''}
+                return {'date': '', 'author': '', 'full_content': ''}
 
     def extract_article_data(self, article_element) -> Optional[Dict]:
         """
@@ -256,12 +270,14 @@ class MoneyControlCrawl4AIScraper:
                         if isinstance(detail, dict):
                             article['date'] = detail.get('date', '')
                             article['author'] = detail.get('author', '')
-                            if detail.get('date') or detail.get('author'):
+                            article['full_content'] = detail.get('full_content', '')
+                            if detail.get('date') or detail.get('author') or detail.get('full_content'):
                                 success_count += 1
                         else:
                             # Exception occurred
                             article['date'] = ''
                             article['author'] = ''
+                            article['full_content'] = ''
                             logger.warning(f"Failed to fetch details for: {article['url']}")
 
                     logger.info(f"[SUCCESS] Successfully fetched details for {success_count}/{len(articles)} articles")
@@ -327,21 +343,62 @@ class MoneyControlCrawl4AIScraper:
 
 async def main():
     """Main execution function"""
-    # Initialize scraper with concurrency limit
-    scraper = MoneyControlCrawl4AIScraper(
-        fetch_details=True,
-        max_concurrent=5  # Max 5 concurrent detail page requests (adjust as needed)
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description='Moneycontrol News Scraper with Crawl4AI',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python scrapers/crawl4ai_scraper.py --pages 5
+  python scrapers/crawl4ai_scraper.py --pages 10 --upload-mongo
+  python scrapers/crawl4ai_scraper.py --pages 3 --max-concurrent 3 --upload-mongo
+        """
+    )
+    parser.add_argument(
+        '--pages',
+        type=int,
+        default=3,
+        help='Number of pages to scrape (default: 3)'
+    )
+    parser.add_argument(
+        '--max-concurrent',
+        type=int,
+        default=5,
+        help='Maximum concurrent requests for detail pages (default: 5)'
+    )
+    parser.add_argument(
+        '--delay',
+        type=float,
+        default=2.0,
+        help='Delay between page requests in seconds (default: 2.0)'
+    )
+    parser.add_argument(
+        '--upload-mongo',
+        action='store_true',
+        help='Upload results to MongoDB after scraping'
+    )
+    parser.add_argument(
+        '--no-details',
+        action='store_true',
+        help='Skip fetching article details (date, author, full_content)'
     )
 
-    # Scrape first 3 pages (you can adjust this)
-    num_pages = 30
-    logger.info(f"Starting Crawl4AI scraper for {num_pages} pages with max {scraper.max_concurrent} concurrent requests...")
+    args = parser.parse_args()
 
-    articles = await scraper.scrape_multiple_pages(num_pages=num_pages, delay=2.0)
+    # Initialize scraper with concurrency limit
+    scraper = MoneyControlCrawl4AIScraper(
+        fetch_details=not args.no_details,
+        max_concurrent=args.max_concurrent
+    )
+
+    logger.info(f"Starting Crawl4AI scraper for {args.pages} pages with max {scraper.max_concurrent} concurrent requests...")
+
+    articles = await scraper.scrape_multiple_pages(num_pages=args.pages, delay=args.delay)
 
     if articles:
         # Save in multiple formats
-        scraper.save_to_json(articles)
+        json_filename = "moneycontrol_news_crawl4ai.json"
+        scraper.save_to_json(articles, json_filename)
         scraper.save_to_csv(articles)
 
         # Print summary
@@ -356,12 +413,65 @@ async def main():
             print(f"{i}. {article.get('title', 'No title')}")
             print(f"   URL: {article.get('url', 'No URL')}")
             print(f"   Date: {article.get('date', 'No date')}")
+            print(f"   Author: {article.get('author', 'No author')}")
             print(f"   Summary: {article.get('summary', 'No summary')[:100]}...")
+            if article.get('full_content'):
+                print(f"   Full Content: {article.get('full_content', '')[:100]}...")
             print()
+
+        # Upload to MongoDB if flag is set
+        if args.upload_mongo:
+            print(f"\n{'='*60}")
+            print("Uploading to MongoDB...")
+            print(f"{'='*60}\n")
+
+            try:
+                # Import MongoDB uploader
+                sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                from upload_to_mongodb import MongoDBUploader, MONGODB_CONNECTION_STRING, DATABASE_NAME, COLLECTION_NAME
+
+                # Initialize uploader
+                uploader = MongoDBUploader(
+                    connection_string=MONGODB_CONNECTION_STRING,
+                    database_name=DATABASE_NAME,
+                    collection_name=COLLECTION_NAME
+                )
+
+                # Connect to MongoDB
+                if uploader.connect():
+                    # Create indexes
+                    uploader.create_indexes()
+
+                    # Upload articles
+                    stats = uploader.upload_articles(articles, upsert=True)
+
+                    # Display statistics
+                    uploader.get_collection_stats()
+
+                    print(f"\n{'='*60}")
+                    print("MongoDB Upload Summary:")
+                    print(f"  - Inserted: {stats['inserted']}")
+                    print(f"  - Updated: {stats['updated']}")
+                    print(f"  - Skipped: {stats['skipped']}")
+                    print(f"  - Failed: {stats['failed']}")
+                    print(f"{'='*60}\n")
+
+                    # Close connection
+                    uploader.close()
+                else:
+                    logger.error("Failed to connect to MongoDB. Please check your configuration.")
+
+            except ImportError as e:
+                logger.error(f"Failed to import MongoDB uploader: {e}")
+                logger.error("Make sure pymongo is installed: pip install pymongo")
+            except Exception as e:
+                logger.error(f"Error uploading to MongoDB: {e}")
+
     else:
         logger.warning("No articles were scraped!")
 
 
 if __name__ == "__main__":
     # Run the async main function
+    import os
     asyncio.run(main())

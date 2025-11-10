@@ -69,8 +69,28 @@ playwright install chromium
 
 **Option 1: Crawl4AI (RECOMMENDED 🚀)**
 ```bash
+# Basic usage (scrapes 3 pages by default)
 python run_crawl4ai.py
+
+# Scrape 10 pages
+python run_crawl4ai.py --pages 10
+
+# Scrape 5 pages and upload directly to MongoDB
+python run_crawl4ai.py --pages 5 --upload-mongo
+
+# Scrape with custom settings
+python run_crawl4ai.py --pages 10 --max-concurrent 3 --delay 3.0 --upload-mongo
+
+# View all options
+python run_crawl4ai.py --help
 ```
+
+**Available Options:**
+- `--pages N`: Number of pages to scrape (default: 3)
+- `--max-concurrent N`: Max concurrent detail page requests (default: 5)
+- `--delay SECONDS`: Delay between page requests (default: 2.0)
+- `--upload-mongo`: Upload results to MongoDB after scraping
+- `--no-details`: Skip fetching article details (faster, but no date/author/full_content)
 
 **Option 2: Playwright**
 ```bash
@@ -102,16 +122,48 @@ scraper_crawl4ai.log               # Log file untuk debugging
     "image_url": "https://images.moneycontrol.com/...",
     "date": "November 07, 2025",
     "author": "Moneycontrol News",
+    "full_content": "Federal Reserve Chair Jerome Powell said...\n\nThe central bank has been monitoring...\n\nPowell emphasized that...",
     "scraped_at": "2025-11-07T08:30:00.123456"
   }
 ]
 ```
 
+**Field Descriptions:**
+- `title`: Judul artikel
+- `url`: URL lengkap artikel
+- `summary`: Ringkasan/excerpt dari list page
+- `image_url`: URL gambar thumbnail
+- `date`: Tanggal publikasi (dari detail page)
+- `author`: Nama penulis (dari detail page)
+- `full_content`: Konten artikel lengkap (semua paragraf dari detail page)
+- `scraped_at`: Timestamp scraping
+
 ## 💾 Upload ke MongoDB
 
-Upload hasil scraping ke MongoDB dengan mudah:
+Upload hasil scraping ke MongoDB dengan 2 cara:
 
-### Setup
+### **Cara 1: Auto-Upload Saat Scraping (RECOMMENDED)**
+
+Gunakan flag `--upload-mongo` untuk langsung upload setelah scraping:
+
+```bash
+# Setup: Edit .env atau upload_to_mongodb.py dengan MongoDB credentials
+cp .env.example .env
+nano .env  # Isi MONGODB_CONNECTION_STRING, DATABASE_NAME, dll
+
+# Scrape dan upload langsung
+python run_crawl4ai.py --pages 5 --upload-mongo
+```
+
+### **Cara 2: Upload Manual dari File JSON**
+
+Upload file JSON yang sudah ada:
+
+```bash
+python upload_to_mongodb.py
+```
+
+### Setup MongoDB
 
 ```bash
 # Install pymongo (sudah ada di requirements.txt)
@@ -140,12 +192,6 @@ Atau edit langsung di `upload_to_mongodb.py`:
 MONGODB_CONNECTION_STRING = "mongodb://localhost:27017/"
 DATABASE_NAME = "moneycontrol_db"
 COLLECTION_NAME = "news_articles"
-```
-
-### Upload Data
-
-```bash
-python upload_to_mongodb.py
 ```
 
 **Fitur Upload:**
@@ -330,6 +376,7 @@ Setiap artikel memiliki field:
 | `image_url` | URL gambar thumbnail | List page |
 | `date` | Tanggal publikasi | Detail page |
 | `author` | Nama penulis | Detail page |
+| `full_content` | Konten artikel lengkap (semua paragraf) | Detail page |
 | `scraped_at` | Timestamp scraping | Generated |
 
 ### Import Sebagai Module
