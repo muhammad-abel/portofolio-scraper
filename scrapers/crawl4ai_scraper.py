@@ -6,6 +6,8 @@ Modern async scraper using Crawl4AI - the most powerful choice!
 
 import asyncio
 import os
+import base64
+import hashlib
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from bs4 import BeautifulSoup
@@ -45,6 +47,29 @@ class MoneyControlCrawl4AIScraper:
         self.base_url = base_url
         self.fetch_details = fetch_details
         self.max_concurrent = max_concurrent  # Limit concurrent requests
+
+    @staticmethod
+    def generate_article_hash(title: str, date: str) -> str:
+        """
+        Generate unique hash from title and date using base64 encoding
+
+        Args:
+            title: Article title
+            date: Article date
+
+        Returns:
+            Base64 encoded hash string
+        """
+        # Combine title and date, normalize to lowercase and strip whitespace
+        combined = f"{title.lower().strip()}|{date.lower().strip()}"
+
+        # Create SHA256 hash
+        hash_object = hashlib.sha256(combined.encode('utf-8'))
+
+        # Convert to base64 and decode to string
+        base64_hash = base64.b64encode(hash_object.digest()).decode('utf-8')
+
+        return base64_hash
 
     async def fetch_article_details(self, url: str, crawler: AsyncWebCrawler, retries: int = 2) -> Dict[str, str]:
         """
@@ -272,6 +297,13 @@ class MoneyControlCrawl4AIScraper:
                             article['date'] = detail.get('date', '')
                             article['author'] = detail.get('author', '')
                             article['full_content'] = detail.get('full_content', '')
+
+                            # Generate unique hash from title and date
+                            article['hash'] = self.generate_article_hash(
+                                article.get('title', ''),
+                                article.get('date', '')
+                            )
+
                             if detail.get('date') or detail.get('author') or detail.get('full_content'):
                                 success_count += 1
                         else:
@@ -279,9 +311,21 @@ class MoneyControlCrawl4AIScraper:
                             article['date'] = ''
                             article['author'] = ''
                             article['full_content'] = ''
+                            article['hash'] = self.generate_article_hash(
+                                article.get('title', ''),
+                                ''
+                            )
                             logger.warning(f"Failed to fetch details for: {article['url']}")
 
                     logger.info(f"[SUCCESS] Successfully fetched details for {success_count}/{len(articles)} articles")
+
+                else:
+                    # If not fetching details, generate hash from title only (or with empty date)
+                    for article in articles:
+                        article['hash'] = self.generate_article_hash(
+                            article.get('title', ''),
+                            article.get('date', '')  # Will use date from list page if available
+                        )
 
         except Exception as e:
             logger.error(f"Error scraping page {page_number}: {str(e)}")
@@ -414,6 +458,7 @@ Examples:
         for i, article in enumerate(articles[:3], 1):
             print(f"{i}. {article.get('title', 'No title')}")
             print(f"   URL: {article.get('url', 'No URL')}")
+            print(f"   Hash: {article.get('hash', 'No hash')}")
             print(f"   Date: {article.get('date', 'No date')}")
             print(f"   Author: {article.get('author', 'No author')}")
             print(f"   Summary: {article.get('summary', 'No summary')[:100]}...")

@@ -157,8 +157,11 @@ class MongoDBUploader:
         try:
             logger.info("Creating indexes...")
 
-            # Create unique index on URL to prevent duplicates
-            self.collection.create_index("url", unique=True)
+            # Create unique index on hash to prevent duplicates
+            self.collection.create_index("hash", unique=True)
+
+            # Create index on URL for lookup
+            self.collection.create_index("url")
 
             # Create index on date for faster date-based queries
             self.collection.create_index("date")
@@ -203,10 +206,13 @@ class MongoDBUploader:
                     # Add upload timestamp
                     article['uploaded_at'] = datetime.now().isoformat()
 
-                    # Create upsert operation based on URL
+                    # Create upsert operation based on hash (unique identifier)
+                    # Fall back to URL if hash is not available (for backward compatibility)
+                    filter_key = {"hash": article["hash"]} if "hash" in article else {"url": article["url"]}
+
                     operations.append(
                         UpdateOne(
-                            {"url": article["url"]},
+                            filter_key,
                             {"$set": article},
                             upsert=True
                         )

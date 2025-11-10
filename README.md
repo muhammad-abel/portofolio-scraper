@@ -120,6 +120,7 @@ scraper_crawl4ai.log               # Log file untuk debugging
   {
     "title": "Powell says tariffs adding some pressure to inflation...",
     "url": "https://www.moneycontrol.com/news/business/markets/...",
+    "hash": "kH8x5yF2mQ9nL3pR7vT1wK4sJ6bN0cV8zX2dG5hM1aY=",
     "summary": "Federal Reserve Chair Jerome Powell said tariffs...",
     "image_url": "https://images.moneycontrol.com/...",
     "date": "November 07, 2025",
@@ -133,6 +134,7 @@ scraper_crawl4ai.log               # Log file untuk debugging
 **Field Descriptions:**
 - `title`: Judul artikel
 - `url`: URL lengkap artikel
+- `hash`: **Unique identifier** (SHA256 hash dari title+date, encoded base64) - untuk mencegah duplikasi
 - `summary`: Ringkasan/excerpt dari list page
 - `image_url`: URL gambar thumbnail
 - `date`: Tanggal publikasi (dari detail page)
@@ -197,12 +199,18 @@ COLLECTION_NAME = "news_articles"
 ```
 
 **Fitur Upload:**
-- Auto-deduplication berdasarkan URL
+- Auto-deduplication berdasarkan **hash** (SHA256 dari title+date)
 - Upsert mode (update existing + insert new)
 - Bulk operations untuk performa tinggi
 - Progress tracking & logging
 - Error handling yang robust
 - Auto-indexing untuk query performance
+
+**Catatan Deduplication:**
+- Scraper menggunakan hash SHA256 (base64) dari kombinasi `title + date` sebagai unique identifier
+- Hash lebih reliable daripada URL karena URL bisa berubah tapi konten tetap sama
+- MongoDB akan otomatis skip artikel duplikat berdasarkan hash
+- Jika ada artikel dengan judul dan tanggal yang sama, hanya versi terbaru yang tersimpan
 
 ## 🎛️ Konfigurasi
 
@@ -374,6 +382,7 @@ Setiap artikel memiliki field:
 |-------|-----------|--------|
 | `title` | Judul berita | List page |
 | `url` | Link artikel lengkap | List page |
+| `hash` | **Unique identifier** (SHA256 dari title+date, base64 encoded) | Generated |
 | `summary` | Ringkasan/excerpt | List page |
 | `image_url` | URL gambar thumbnail | List page |
 | `date` | Tanggal publikasi | Detail page |
