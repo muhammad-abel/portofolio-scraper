@@ -112,7 +112,12 @@ class MoneyControlCrawl4AIScraper:
                 author_elem = soup.find('div', class_='article_author')
                 if author_elem:
                     author_link = author_elem.find('a')
-                    author = author_link.get_text(strip=True) if author_link else ''
+                    if author_link:
+                        # Primary: extract from <a> tag
+                        author = author_link.get_text(strip=True)
+                    else:
+                        # Fallback: extract directly from div if no <a> tag
+                        author = author_elem.get_text(strip=True)
 
                 # Extract date from <div class="article_schedule"> <span>
                 date = ''
