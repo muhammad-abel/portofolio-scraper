@@ -21,8 +21,10 @@ portofolio-scraper/
 ├── run_crawl4ai.py             # Quick run script (Crawl4AI)
 ├── run_playwright.py           # Quick run script (Playwright)
 ├── run_requests.py             # Quick run script (Requests)
+├── upload_to_mongodb.py        # Upload JSON data ke MongoDB
 ├── config.py                   # Konfigurasi settings
 ├── requirements.txt            # Dependencies
+├── .env.example                # Contoh konfigurasi environment variables
 ├── README.md                   # Dokumentasi utama
 └── .gitignore                  # Git ignore rules
 ```
@@ -35,6 +37,7 @@ portofolio-scraper/
 - ✅ **Concurrency Control**: Limit concurrent requests untuk stabilitas
 - ✅ **Error Handling**: Retry mechanism dengan exponential backoff
 - ✅ **Multiple Export**: JSON, CSV, dan Excel
+- ✅ **MongoDB Integration**: Upload otomatis ke MongoDB dengan deduplication
 - ✅ **Comprehensive Logging**: Track semua aktivitas scraping
 
 ## 🚀 Quick Start
@@ -103,6 +106,55 @@ scraper_crawl4ai.log               # Log file untuk debugging
   }
 ]
 ```
+
+## 💾 Upload ke MongoDB
+
+Upload hasil scraping ke MongoDB dengan mudah:
+
+### Setup
+
+```bash
+# Install pymongo (sudah ada di requirements.txt)
+pip install pymongo
+
+# Copy .env.example ke .env
+cp .env.example .env
+
+# Edit .env dan isi dengan MongoDB credentials Anda
+nano .env  # atau text editor lainnya
+```
+
+### Konfigurasi
+
+Edit `.env` file:
+
+```bash
+MONGODB_CONNECTION_STRING=mongodb://localhost:27017/
+MONGODB_DATABASE_NAME=moneycontrol_db
+MONGODB_COLLECTION_NAME=news_articles
+```
+
+Atau edit langsung di `upload_to_mongodb.py`:
+
+```python
+MONGODB_CONNECTION_STRING = "mongodb://localhost:27017/"
+DATABASE_NAME = "moneycontrol_db"
+COLLECTION_NAME = "news_articles"
+```
+
+### Upload Data
+
+```bash
+python upload_to_mongodb.py
+```
+
+**Fitur Upload:**
+- Auto-deduplication berdasarkan URL
+- Upsert mode (update existing + insert new)
+- Bulk operations untuk performa tinggi
+- Progress tracking & logging
+- Error handling yang robust
+- Auto-indexing untuk query performance
 
 ## 🎛️ Konfigurasi
 

@@ -6,3 +6,4 @@ python-dotenv==1.0.1
 crawl4ai==0.3.74
 playwright==1.40.0
 aiohttp==3.9.1
+pymongo==4.6.1
