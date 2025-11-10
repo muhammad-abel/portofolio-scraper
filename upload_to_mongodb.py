@@ -203,9 +203,6 @@ class MongoDBUploader:
 
                 operations = []
                 for article in articles:
-                    # Add upload timestamp
-                    article['uploaded_at'] = datetime.now().isoformat()
-
                     # Create upsert operation based on hash (unique identifier)
                     # Fall back to URL if hash is not available (for backward compatibility)
                     filter_key = {"hash": article["hash"]} if "hash" in article else {"url": article["url"]}
@@ -234,9 +231,6 @@ class MongoDBUploader:
 
                 for article in articles:
                     try:
-                        # Add upload timestamp
-                        article['uploaded_at'] = datetime.now().isoformat()
-
                         self.collection.insert_one(article)
                         stats["inserted"] += 1
 
