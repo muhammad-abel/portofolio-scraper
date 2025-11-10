@@ -1,32 +1,39 @@
-# Moneycontrol News Scraper
+# Portfolio Web Scrapers
 
-Web scraper untuk mengekstrak berita dari Moneycontrol.com bagian Markets (https://www.moneycontrol.com/news/business/markets/)
+Collection of web scrapers untuk berbagai website - Moneycontrol News & TradingEconomics Indicators
 
 ## 📁 Struktur Project
 
 ```
 portofolio-scraper/
-├── scrapers/                    # Core scraper modules
+├── scrapers/                       # Core scraper modules
 │   ├── __init__.py
-│   ├── crawl4ai_scraper.py      # Scraper dengan Crawl4AI (RECOMMENDED)
-│   ├── playwright_scraper.py    # Scraper dengan Playwright
-│   ├── requests_scraper.py      # Scraper dengan Requests (basic)
-│   └── auto_pages_scraper.py    # Enhanced scraper dengan auto-detect pages
-├── examples/                    # Example & template scripts
-│   ├── custom_scraper.py        # Template untuk custom website
-│   └── json_output_examples.py  # Contoh berbagai format JSON output
-├── docs/                        # Documentation
-│   ├── SCRAPING_GUIDE.md        # Panduan lengkap web scraping
-│   └── ERROR_HANDLING_GUIDE.md  # Troubleshooting & error handling
-├── run_crawl4ai.py             # Quick run script (Crawl4AI)
-├── run_playwright.py           # Quick run script (Playwright)
-├── run_requests.py             # Quick run script (Requests)
-├── upload_to_mongodb.py        # Upload JSON data ke MongoDB
-├── config.py                   # Konfigurasi settings
-├── requirements.txt            # Dependencies
-├── .env.example                # Contoh konfigurasi environment variables
-├── README.md                   # Dokumentasi utama
-└── .gitignore                  # Git ignore rules
+│   ├── crawl4ai_scraper.py         # Moneycontrol scraper (RECOMMENDED)
+│   ├── playwright_scraper.py       # Moneycontrol Playwright scraper
+│   ├── requests_scraper.py         # Moneycontrol Requests scraper
+│   ├── auto_pages_scraper.py       # Moneycontrol auto-detect pages
+│   └── tradingeconomics/           # TradingEconomics scrapers
+│       ├── __init__.py
+│       └── indicators_scraper.py   # Economic indicators scraper
+├── examples/                       # Example & template scripts
+│   ├── custom_scraper.py           # Template untuk custom website
+│   └── json_output_examples.py     # Contoh berbagai format JSON output
+├── docs/                           # Documentation
+│   ├── SCRAPING_GUIDE.md           # Panduan lengkap web scraping
+│   └── ERROR_HANDLING_GUIDE.md     # Troubleshooting & error handling
+├── logs/                           # Log files (auto-created)
+│   ├── moneycontrol/
+│   └── tradingeconomics/
+├── run_crawl4ai.py                 # Moneycontrol scraper runner
+├── run_playwright.py               # Moneycontrol Playwright runner
+├── run_requests.py                 # Moneycontrol Requests runner
+├── run_tradingeconomics.py         # TradingEconomics scraper runner (NEW)
+├── upload_to_mongodb.py            # Upload JSON data ke MongoDB
+├── config.py                       # Konfigurasi settings
+├── requirements.txt                # Dependencies
+├── .env.example                    # Contoh konfigurasi environment variables
+├── README.md                       # Dokumentasi utama
+└── .gitignore                      # Git ignore rules
 ```
 
 ## ✨ Fitur
@@ -492,6 +499,94 @@ articles = await scraper.scrape_all_pages()  # Otomatis detect & scrape semua
 - pandas
 - crawl4ai (untuk Crawl4AI scraper - RECOMMENDED)
 - playwright (untuk Playwright dan Crawl4AI scraper)
+
+---
+
+---
+
+# 📊 TradingEconomics Indicators Scraper
+
+Scraper untuk mengekstrak data economic indicators dari TradingEconomics.com
+
+## 🚀 Quick Start - TradingEconomics
+
+```bash
+# Scrape all tabs for India
+python run_tradingeconomics.py --country india
+
+# Scrape specific tabs
+python run_tradingeconomics.py --country india --tabs gdp,labour,prices
+
+# Scrape and upload to MongoDB
+python run_tradingeconomics.py --country india --upload-mongo
+
+# Scrape specific tabs with MongoDB upload
+python run_tradingeconomics.py --country india --tabs gdp,labour --upload-mongo
+```
+
+## 📋 Available Tabs
+
+11 tabs tersedia untuk scraping:
+- `overview` - Overview indicators
+- `gdp` - GDP indicators
+- `labour` - Labour market indicators
+- `prices` - Price indicators (inflation, CPI, etc.)
+- `money` - Monetary indicators
+- `trade` - Trade indicators
+- `government` - Government indicators
+- `business` - Business indicators
+- `consumer` - Consumer indicators
+- `housing` - Housing indicators
+- `health` - Health indicators
+
+## 📊 Output Files
+
+**JSON per tab:**
+```
+tradingeconomics_india_overview.json
+tradingeconomics_india_gdp.json
+tradingeconomics_india_labour.json
+tradingeconomics_india_prices.json
+...
+```
+
+**Log files:**
+```
+logs/tradingeconomics/scraper_india.log
+```
+
+## 💾 Data Structure - TradingEconomics
+
+```json
+{
+  "country": "india",
+  "tab_name": "gdp",
+  "indicator": "GDP Growth Rate",
+  "last": "6.5",
+  "previous": "7.2",
+  "highest": "8.9",
+  "lowest": "3.1",
+  "unit": "%",
+  "reference": "Q2 2025",
+  "hash": "abc123...",
+  "scraped_at": "2025-11-10T..."
+}
+```
+
+## 🗄️ MongoDB - TradingEconomics
+
+**Collection:** `indicators` (dalam database yang dikonfigurasi di `.env`)
+
+**Index:**
+- Unique index: `hash` (SHA256 dari country + tab + indicator)
+- Index: `country`, `tab_name`
+
+**Configuration:**
+Edit `.env` file:
+```bash
+MONGODB_CONNECTION_STRING=mongodb://localhost:27017/
+MONGODB_DATABASE_NAME=tradingeconomics_db
+```
 
 ---
 
