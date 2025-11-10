@@ -334,7 +334,7 @@ async def main():
     )
 
     # Scrape first 3 pages (you can adjust this)
-    num_pages = 3
+    num_pages = 30
     logger.info(f"Starting Crawl4AI scraper for {num_pages} pages with max {scraper.max_concurrent} concurrent requests...")
 
     articles = await scraper.scrape_multiple_pages(num_pages=num_pages, delay=2.0)
