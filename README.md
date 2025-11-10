@@ -2,67 +2,164 @@
 
 Web scraper untuk mengekstrak berita dari Moneycontrol.com bagian Markets (https://www.moneycontrol.com/news/business/markets/)
 
-## Fitur
+## 📁 Struktur Project
 
-- ✅ Scraping berita dari multiple pages
-- ✅ Ekstraksi data: judul, URL, tanggal, ringkasan, gambar, author
-- ✅ Export ke JSON, CSV, dan Excel
-- ✅ Rate limiting dan retry mechanism
-- ✅ Comprehensive logging
-- ✅ Tiga mode scraper: Regular (requests), Crawl4AI (modern & powerful), dan Playwright (async & reliable)
-- ✅ Async/await support untuk performa maksimal
+```
+portofolio-scraper/
+├── scrapers/                    # Core scraper modules
+│   ├── __init__.py
+│   ├── crawl4ai_scraper.py      # Scraper dengan Crawl4AI (RECOMMENDED)
+│   ├── playwright_scraper.py    # Scraper dengan Playwright
+│   ├── requests_scraper.py      # Scraper dengan Requests (basic)
+│   └── auto_pages_scraper.py    # Enhanced scraper dengan auto-detect pages
+├── examples/                    # Example & template scripts
+│   ├── custom_scraper.py        # Template untuk custom website
+│   └── json_output_examples.py  # Contoh berbagai format JSON output
+├── docs/                        # Documentation
+│   ├── SCRAPING_GUIDE.md        # Panduan lengkap web scraping
+│   └── ERROR_HANDLING_GUIDE.md  # Troubleshooting & error handling
+├── run_crawl4ai.py             # Quick run script (Crawl4AI)
+├── run_playwright.py           # Quick run script (Playwright)
+├── run_requests.py             # Quick run script (Requests)
+├── config.py                   # Konfigurasi settings
+├── requirements.txt            # Dependencies
+├── README.md                   # Dokumentasi utama
+└── .gitignore                  # Git ignore rules
+```
 
-## Instalasi
+## ✨ Fitur
 
-### 1. Clone repository
+- ✅ **3 Mode Scraper**: Crawl4AI (powerful), Playwright (reliable), Requests (simple)
+- ✅ **Auto Page Detection**: Otomatis detect total pages yang tersedia
+- ✅ **Detail Extraction**: Fetch date & author dari detail page
+- ✅ **Concurrency Control**: Limit concurrent requests untuk stabilitas
+- ✅ **Error Handling**: Retry mechanism dengan exponential backoff
+- ✅ **Multiple Export**: JSON, CSV, dan Excel
+- ✅ **Comprehensive Logging**: Track semua aktivitas scraping
+
+## 🚀 Quick Start
+
+### 1. Clone & Setup
+
 ```bash
 git clone <repository-url>
 cd portofolio-scraper
 ```
 
-### 2. Buat virtual environment (recommended)
+### 2. Install Dependencies
+
 ```bash
+# Buat virtual environment (recommended)
 python3 -m venv venv
 source venv/bin/activate  # Linux/Mac
 # atau
 venv\Scripts\activate  # Windows
-```
 
-### 3. Install dependencies
-```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-### 4. Install Playwright browsers (untuk Crawl4AI & Playwright scraper)
-```bash
+# Install Playwright browsers (untuk Crawl4AI & Playwright)
 playwright install chromium
 ```
 
-**Catatan:** Chrome/Chromium akan otomatis di-download oleh Playwright.
+### 3. Run Scraper
 
-## Cara Penggunaan
-
-### Mode 1: Crawl4AI Scraper (RECOMMENDED! 🚀)
-
-Scraper modern menggunakan Crawl4AI - paling powerful dan otomatis handle JavaScript:
-
+**Option 1: Crawl4AI (RECOMMENDED 🚀)**
 ```bash
-python moneycontrol_scraper_crawl4ai.py
+python run_crawl4ai.py
 ```
+
+**Option 2: Playwright**
+```bash
+python run_playwright.py
+```
+
+**Option 3: Requests (Simple)**
+```bash
+python run_requests.py
+```
+
+## 📊 Output
+
+Scraper akan menghasilkan:
+```
+moneycontrol_news_crawl4ai.json    # Data dalam format JSON
+moneycontrol_news_crawl4ai.csv     # Data dalam format CSV
+scraper_crawl4ai.log               # Log file untuk debugging
+```
+
+### Contoh Output JSON
+
+```json
+[
+  {
+    "title": "Powell says tariffs adding some pressure to inflation...",
+    "url": "https://www.moneycontrol.com/news/business/markets/...",
+    "summary": "Federal Reserve Chair Jerome Powell said tariffs...",
+    "image_url": "https://images.moneycontrol.com/...",
+    "date": "November 07, 2025",
+    "author": "Moneycontrol News",
+    "scraped_at": "2025-11-07T08:30:00.123456"
+  }
+]
+```
+
+## 🎛️ Konfigurasi
+
+Edit `config.py` untuk customize:
+
+```python
+NUM_PAGES = 3              # Jumlah halaman yang akan di-scrape
+DELAY_BETWEEN_PAGES = 2.0  # Delay antar page (detik)
+OUTPUT_JSON = True         # Export ke JSON
+OUTPUT_CSV = True          # Export ke CSV
+```
+
+Atau configure di code:
+
+```python
+from scrapers import MoneyControlCrawl4AIScraper
+
+# Custom configuration
+scraper = MoneyControlCrawl4AIScraper(
+    fetch_details=True,      # Fetch date & author dari detail page
+    max_concurrent=5         # Max 5 concurrent requests (adjust sesuai network)
+)
+
+# Scrape dengan custom settings
+articles = await scraper.scrape_multiple_pages(
+    num_pages=5,            # Scrape 5 pages
+    delay=2.0               # 2 detik delay antar page
+)
+```
+
+## 📚 Mode Scraper
+
+### 🚀 **Crawl4AI Scraper** (RECOMMENDED)
 
 **Keunggulan:**
 - Built khusus untuk AI/LLM extraction
 - Otomatis handle JavaScript
 - Async untuk performa tinggi
 - Smart content extraction
+- **Concurrency control** untuk stabilitas
 
-### Mode 2: Playwright Scraper (Control Penuh)
-
-Gunakan Playwright untuk kontrol maksimal atas browser:
-
+**Penggunaan:**
 ```bash
-python moneycontrol_scraper_playwright.py
+python run_crawl4ai.py
 ```
+
+**Konfigurasi:**
+```python
+scraper = MoneyControlCrawl4AIScraper(
+    fetch_details=True,     # Fetch dari detail page
+    max_concurrent=5        # Limit concurrent requests
+)
+```
+
+---
+
+### 🎭 **Playwright Scraper**
 
 **Keunggulan:**
 - Full browser automation
@@ -70,122 +167,191 @@ python moneycontrol_scraper_playwright.py
 - Async/await support
 - Debugging yang mudah
 
-### Mode 3: Regular Scraper (Ringan & Cepat)
-
-Scraper basic menggunakan `requests` dan `BeautifulSoup`:
-
+**Penggunaan:**
 ```bash
-python moneycontrol_scraper.py
+python run_playwright.py
 ```
+
+---
+
+### 📡 **Requests Scraper** (Basic)
 
 **Keunggulan:**
 - Paling ringan dan cepat
 - Tidak perlu browser
 - Cocok untuk static content
 
-### Kustomisasi
+**Penggunaan:**
+```bash
+python run_requests.py
+```
 
-Edit file `config.py` untuk mengubah pengaturan:
+---
+
+## 🔧 Troubleshooting
+
+### Error: Timeout
+
+Jika sering terjadi timeout:
 
 ```python
-NUM_PAGES = 5  # Ubah jumlah halaman yang akan di-scrape
-DELAY_BETWEEN_PAGES = 2.0  # Delay antar request (detik)
-OUTPUT_JSON = True  # Export ke JSON
-OUTPUT_CSV = True  # Export ke CSV
-OUTPUT_EXCEL = True  # Export ke Excel
+# Kurangi concurrent requests
+scraper = MoneyControlCrawl4AIScraper(max_concurrent=3)
+
+# Tambah delay antar page
+articles = await scraper.scrape_multiple_pages(num_pages=3, delay=3.0)
 ```
 
-## Output
+Baca: `docs/ERROR_HANDLING_GUIDE.md`
 
-Scraper akan menghasilkan file-file berikut:
+### Error: UnicodeEncodeError (Windows)
 
-- `moneycontrol_news.json` - Format JSON
-- `moneycontrol_news.csv` - Format CSV (bisa dibuka di Excel)
-- `moneycontrol_news.xlsx` - Format Excel (opsional)
-- `scraper.log` - Log file untuk debugging
-
-### Contoh Output JSON
-
-```json
-[
-  {
-    "title": "Stock market today: Sensex gains 500 points...",
-    "url": "https://www.moneycontrol.com/news/...",
-    "date": "December 15, 2024",
-    "summary": "Indian stock market extended gains...",
-    "image_url": "https://...",
-    "author": "Author Name",
-    "scraped_at": "2024-12-15T10:30:00"
-  }
-]
-```
-
-## Struktur Data
-
-Setiap artikel memiliki field berikut:
-
-| Field | Deskripsi |
-|-------|-----------|
-| `title` | Judul berita |
-| `url` | Link ke artikel lengkap |
-| `date` | Tanggal publikasi |
-| `summary` | Ringkasan/excerpt artikel |
-| `image_url` | URL gambar thumbnail |
-| `author` | Nama penulis (jika tersedia) |
-| `scraped_at` | Timestamp saat data di-scrape |
-
-## Troubleshooting
-
-### Error: Connection refused
-- Cek koneksi internet
-- Website mungkin memblokir request - coba gunakan Crawl4AI atau Playwright scraper
-- Tambah delay antar request di `config.py`
-
-### Error: No articles found
-- Website mungkin mengubah struktur HTML
-- Periksa log file untuk detail
-- Coba Crawl4AI scraper sebagai alternatif (paling powerful)
+Sudah diperbaiki! Emoji diganti dengan text labels.
 
 ### Error: Playwright browser tidak tersedia
+
 ```bash
-# Install Playwright browsers
 playwright install chromium
 ```
 
-### Error: Crawl4AI installation
+### Error: Module not found
+
 ```bash
-# Update pip dan install ulang
-pip install --upgrade pip
-pip install crawl4ai --upgrade
+pip install -r requirements.txt --upgrade
 ```
 
-## Best Practices
+---
 
-1. **Gunakan rate limiting**: Jangan scrape terlalu cepat untuk menghindari blocking
-2. **Check robots.txt**: Pastikan scraping diizinkan
-3. **Respect terms of service**: Gunakan data secara bertanggung jawab
-4. **Add delays**: Minimal 2 detik antar request
+## 📖 Dokumentasi Lengkap
 
-## Development
+- **`docs/SCRAPING_GUIDE.md`** - Panduan lengkap web scraping
+  - Konsep dasar & flow
+  - Cara inspect element
+  - CSS selector cheat sheet
+  - Template code berbagai use case
+  - Debugging tips
 
-### Menambah field baru
+- **`docs/ERROR_HANDLING_GUIDE.md`** - Troubleshooting guide
+  - Root cause analysis
+  - Concurrency limiting
+  - Retry mechanism
+  - Configuration options
+
+## 🎓 Examples
+
+### Custom Scraper untuk Website Lain
+
+```bash
+python examples/custom_scraper.py
+```
+
+Template yang bisa di-customize untuk scrape website apapun.
+
+### Berbagai Format JSON Output
+
+```bash
+python examples/json_output_examples.py
+```
+
+Generate 8 format JSON berbeda:
+- Standard (default)
+- Compact (space-efficient)
+- With metadata
+- Grouped by date
+- JSONL (JSON Lines)
+- Custom fields
+- API format
+
+---
+
+## 🛠️ Development
+
+### Struktur Data
+
+Setiap artikel memiliki field:
+
+| Field | Deskripsi | Source |
+|-------|-----------|--------|
+| `title` | Judul berita | List page |
+| `url` | Link artikel lengkap | List page |
+| `summary` | Ringkasan/excerpt | List page |
+| `image_url` | URL gambar thumbnail | List page |
+| `date` | Tanggal publikasi | Detail page |
+| `author` | Nama penulis | Detail page |
+| `scraped_at` | Timestamp scraping | Generated |
+
+### Import Sebagai Module
+
+```python
+from scrapers import MoneyControlCrawl4AIScraper
+
+# Initialize
+scraper = MoneyControlCrawl4AIScraper(
+    fetch_details=True,
+    max_concurrent=5
+)
+
+# Scrape
+articles = await scraper.scrape_multiple_pages(num_pages=3)
+
+# Save
+scraper.save_to_json(articles, 'my_output.json')
+scraper.save_to_csv(articles, 'my_output.csv')
+```
+
+### Menambah Field Baru
 
 Edit fungsi `extract_article_data()` di scraper:
 
 ```python
-# Contoh: tambah kategori
-category_elem = article_element.find('span', class_='category')
-article_data['category'] = category_elem.get_text(strip=True) if category_elem else ''
+def extract_article_data(self, article_element):
+    # ... existing code ...
+
+    # Tambah field baru
+    category_elem = article_element.find('span', class_='category')
+    article_data['category'] = category_elem.get_text(strip=True) if category_elem else ''
+
+    return article_data
 ```
 
-### Testing
+---
 
-```bash
-# Test dengan 1 halaman dulu
-python moneycontrol_scraper.py --pages 1
+## ⚙️ Best Practices
+
+1. **Rate Limiting**: Gunakan delay minimal 2 detik antar request
+2. **Concurrency**: Set `max_concurrent=3-5` untuk stabilitas
+3. **Error Handling**: Check logs untuk troubleshooting
+4. **Respect ToS**: Gunakan data secara bertanggung jawab
+5. **Off-Peak Hours**: Scrape di jam sepi untuk performa lebih baik
+
+---
+
+## 📈 Performance Tips
+
+### Untuk Speed:
+```python
+# Increase concurrent (hati-hati!)
+scraper = MoneyControlCrawl4AIScraper(max_concurrent=8)
 ```
 
-## Requirements
+### Untuk Stability:
+```python
+# Decrease concurrent & add delay
+scraper = MoneyControlCrawl4AIScraper(max_concurrent=3)
+articles = await scraper.scrape_multiple_pages(num_pages=5, delay=3.0)
+```
+
+### Auto-Detect All Pages:
+```python
+from scrapers import EnhancedMoneyControlScraper
+
+scraper = EnhancedMoneyControlScraper()
+articles = await scraper.scrape_all_pages()  # Otomatis detect & scrape semua
+```
+
+---
+
+## 🔐 Requirements
 
 - Python 3.8+
 - requests
@@ -194,10 +360,33 @@ python moneycontrol_scraper.py --pages 1
 - crawl4ai (untuk Crawl4AI scraper - RECOMMENDED)
 - playwright (untuk Playwright dan Crawl4AI scraper)
 
-## License
+---
+
+## 📝 License
 
 MIT License
 
-## Disclaimer
+---
+
+## ⚠️ Disclaimer
 
 Tool ini dibuat untuk tujuan edukasi. Pastikan mematuhi terms of service website dan gunakan secara bertanggung jawab.
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Silakan buat issue atau pull request.
+
+---
+
+## 📞 Support
+
+Jika ada pertanyaan atau issue:
+1. Check `docs/` folder untuk dokumentasi
+2. Review logs untuk debugging
+3. Adjust configuration sesuai kebutuhan
+
+---
+
+**Happy Scraping! 🚀**
