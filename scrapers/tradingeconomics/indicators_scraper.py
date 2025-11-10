@@ -6,8 +6,6 @@ Scrapes economic indicators tables from TradingEconomics.com
 
 import asyncio
 import os
-import base64
-import hashlib
 from pathlib import Path
 from crawl4ai import AsyncWebCrawler
 from bs4 import BeautifulSoup
@@ -42,30 +40,6 @@ class TradingEconomicsScraper:
         """
         self.country = country.lower()
         self.base_url = f"https://tradingeconomics.com/{self.country}/indicators"
-
-    @staticmethod
-    def generate_indicator_hash(country: str, tab: str, indicator: str) -> str:
-        """
-        Generate unique hash from country, tab, and indicator using base64 encoding
-
-        Args:
-            country: Country name
-            tab: Tab name
-            indicator: Indicator name
-
-        Returns:
-            Base64 encoded hash string
-        """
-        # Combine country, tab, and indicator, normalize to lowercase and strip whitespace
-        combined = f"{country.lower().strip()}|{tab.lower().strip()}|{indicator.lower().strip()}"
-
-        # Create SHA256 hash
-        hash_object = hashlib.sha256(combined.encode('utf-8'))
-
-        # Convert to base64 and decode to string
-        base64_hash = base64.b64encode(hash_object.digest()).decode('utf-8')
-
-        return base64_hash
 
     async def scrape_tab(self, tab_name: str, crawler: AsyncWebCrawler) -> List[Dict]:
         """
@@ -185,14 +159,6 @@ class TradingEconomicsScraper:
                 indicator_data['country'] = self.country
                 indicator_data['tab_name'] = tab_name
                 indicator_data['scraped_at'] = datetime.now().isoformat()
-
-                # Generate unique hash using indicator name
-                indicator_name = indicator_data.get('indicator', '')
-                indicator_data['hash'] = self.generate_indicator_hash(
-                    self.country,
-                    tab_name,
-                    indicator_name
-                )
 
                 indicators.append(indicator_data)
 
@@ -367,7 +333,6 @@ Examples:
             print(f"   Lowest: {indicator.get('lowest', 'N/A')}")
             print(f"   Unit: {indicator.get('unit', 'N/A')}")
             print(f"   Date: {indicator.get('date', 'N/A')}")
-            print(f"   Hash: {indicator.get('hash', 'N/A')[:20]}...")
             print()
 
     # Upload to MongoDB if flag is set
@@ -408,10 +373,11 @@ Examples:
 
             logger.info(f"Connected to MongoDB: {DATABASE_NAME}.{COLLECTION_NAME}")
 
-            # Create unique index on hash
-            collection.create_index("hash", unique=True)
-            collection.create_index("country")
-            collection.create_index("tab_name")
+            # Create compound unique index on country + tab_name + indicator
+            collection.create_index(
+                [("country", 1), ("tab_name", 1), ("indicator", 1)],
+                unique=True
+            )
             logger.info("Indexes created")
 
             # Bulk upsert
@@ -419,7 +385,11 @@ Examples:
             for indicator in all_indicators:
                 operations.append(
                     UpdateOne(
-                        {"hash": indicator["hash"]},
+                        {
+                            "country": indicator["country"],
+                            "tab_name": indicator["tab_name"],
+                            "indicator": indicator["indicator"]
+                        },
                         {"$set": indicator},
                         upsert=True
                     )
