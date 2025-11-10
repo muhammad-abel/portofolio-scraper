@@ -8,6 +8,7 @@ import asyncio
 import os
 import base64
 import hashlib
+from pathlib import Path
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.extraction_strategy import LLMExtractionStrategy
 from bs4 import BeautifulSoup
@@ -20,16 +21,16 @@ import sys
 import argparse
 from urllib.parse import urljoin
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('scraper_crawl4ai.log'),
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+# Category to URL mapping
+CATEGORIES = {
+    'markets': 'https://www.moneycontrol.com/news/business/markets/',
+    'world': 'https://www.moneycontrol.com/news/business/world/',
+    'stocks': 'https://www.moneycontrol.com/news/business/stocks/',
+    'economy': 'https://www.moneycontrol.com/news/business/economy/'
+}
+
+# Logger will be configured in main()
+logger = None
 
 
 class MoneyControlCrawl4AIScraper:
@@ -439,9 +440,16 @@ async def main():
         epilog="""
 Examples:
   python scrapers/crawl4ai_scraper.py --pages 5
-  python scrapers/crawl4ai_scraper.py --pages 10 --upload-mongo
-  python scrapers/crawl4ai_scraper.py --pages 3 --max-concurrent 3 --upload-mongo
+  python scrapers/crawl4ai_scraper.py --category world --pages 10 --upload-mongo
+  python scrapers/crawl4ai_scraper.py --category stocks --pages 3 --max-concurrent 3 --upload-mongo
         """
+    )
+    parser.add_argument(
+        '--category',
+        type=str,
+        default='markets',
+        choices=list(CATEGORIES.keys()),
+        help='News category to scrape (default: markets)'
     )
     parser.add_argument(
         '--pages',
@@ -474,22 +482,45 @@ Examples:
 
     args = parser.parse_args()
 
+    # Configure logging based on category
+    global logger
+    log_dir = Path('logs')
+    log_dir.mkdir(exist_ok=True)  # Create logs directory if not exists
+
+    log_filename = log_dir / f"scraper_{args.category}_crawl4ai.log"
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(log_filename),
+            logging.StreamHandler(sys.stdout)
+        ],
+        force=True  # Override any existing configuration
+    )
+    logger = logging.getLogger(__name__)
+
+    # Get base URL from category mapping
+    base_url = CATEGORIES[args.category]
+
     # Initialize scraper with concurrency limit
     scraper = MoneyControlCrawl4AIScraper(
+        base_url=base_url,
         fetch_details=not args.no_details,
         max_concurrent=args.max_concurrent
     )
 
-    logger.info(f"Starting Crawl4AI scraper for {args.pages} pages with max {scraper.max_concurrent} concurrent requests...")
+    logger.info(f"Starting Crawl4AI scraper for category '{args.category}' ({args.pages} pages) with max {scraper.max_concurrent} concurrent requests...")
 
     articles = await scraper.scrape_multiple_pages(num_pages=args.pages, delay=args.delay)
 
     if articles:
         # Save to local files only if NOT uploading to MongoDB
         if not args.upload_mongo:
-            json_filename = "moneycontrol_news_crawl4ai.json"
+            json_filename = f"moneycontrol_{args.category}_crawl4ai.json"
+            csv_filename = f"moneycontrol_{args.category}_crawl4ai.csv"
             scraper.save_to_json(articles, json_filename)
-            scraper.save_to_csv(articles)
+            scraper.save_to_csv(articles, csv_filename)
 
         # Print summary
         print(f"\n{'='*60}")

@@ -69,28 +69,51 @@ playwright install chromium
 
 **Option 1: Crawl4AI (RECOMMENDED 🚀)**
 ```bash
-# Basic usage (scrapes 3 pages by default)
+# Basic usage - markets category (default, scrapes 3 pages)
 python run_crawl4ai.py
 
-# Scrape 10 pages
-python run_crawl4ai.py --pages 10
+# Scrape world news
+python run_crawl4ai.py --category world --pages 10
 
-# Scrape 5 pages and upload directly to MongoDB
-python run_crawl4ai.py --pages 5 --upload-mongo
+# Scrape stocks news and upload to MongoDB
+python run_crawl4ai.py --category stocks --pages 5 --upload-mongo
 
-# Scrape with custom settings
-python run_crawl4ai.py --pages 10 --max-concurrent 3 --delay 3.0 --upload-mongo
+# Scrape economy news with custom settings
+python run_crawl4ai.py --category economy --pages 10 --max-concurrent 3 --upload-mongo
 
 # View all options
 python run_crawl4ai.py --help
 ```
 
+**Available Categories:**
+- `markets` - Business/Markets news (default)
+- `world` - World news
+- `stocks` - Stock market news
+- `economy` - Economy news
+
 **Available Options:**
+- `--category NAME`: Category to scrape (default: markets)
 - `--pages N`: Number of pages to scrape (default: 3)
 - `--max-concurrent N`: Max concurrent detail page requests (default: 5)
 - `--delay SECONDS`: Delay between page requests (default: 2.0)
 - `--upload-mongo`: Upload directly to MongoDB (skip local file saving)
 - `--no-details`: Skip fetching article details (faster, but no date/author/full_content)
+
+**Output Files by Category:**
+```
+moneycontrol_markets_crawl4ai.json    # Markets
+moneycontrol_world_crawl4ai.json      # World
+moneycontrol_stocks_crawl4ai.json     # Stocks
+moneycontrol_economy_crawl4ai.json    # Economy
+```
+
+**Log Files (in logs/ directory):**
+```
+logs/scraper_markets_crawl4ai.log
+logs/scraper_world_crawl4ai.log
+logs/scraper_stocks_crawl4ai.log
+logs/scraper_economy_crawl4ai.log
+```
 
 **Note:** Ketika menggunakan `--upload-mongo`, file JSON dan CSV **tidak akan disimpan** secara lokal. Data langsung di-upload ke MongoDB saja.
 
