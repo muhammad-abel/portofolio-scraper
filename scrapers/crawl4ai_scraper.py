@@ -133,6 +133,33 @@ class MoneyControlCrawl4AIScraper:
                     # Join all paragraph texts with newlines
                     full_content = '\n\n'.join([p.get_text(strip=True) for p in paragraphs if p.get_text(strip=True)])
 
+                # FALLBACK: Try alternative format if any field is missing
+                # Some articles use video_content format
+                if not author or not date or not full_content:
+                    logger.debug(f"Trying fallback extraction for {url}")
+
+                    video_content = soup.find('div', class_='video_content')
+                    if video_content:
+                        # Try to extract date from <p class="last_updated">
+                        if not date:
+                            last_updated = video_content.find('p', class_='last_updated')
+                            if last_updated:
+                                date_text = last_updated.get_text(strip=True)
+                                # Extract date after "first published:" or similar text
+                                if 'first published:' in date_text.lower():
+                                    date = date_text.split(':', 1)[1].strip() if ':' in date_text else date_text
+                                else:
+                                    date = date_text
+
+                        # Try to extract full content from <p class="text_3">
+                        if not full_content:
+                            text_3 = video_content.find('p', class_='text_3')
+                            if text_3:
+                                full_content = text_3.get_text(strip=True)
+
+                        # Author might not be available in video format, keep empty if not found
+                        logger.debug(f"[FALLBACK] Used video_content format for {url}")
+
                 if full_content:
                     logger.debug(f"[SUCCESS] Extracted from {url}: author={author}, date={date}, content_length={len(full_content)}")
                 else:
