@@ -113,19 +113,44 @@ class TradingEconomicsScraper:
                 logger.warning(f"Table not found in tab: {tab_name}")
                 return []
 
-            # Extract table headers
-            headers = []
-            thead = table.find('thead')
-            if thead:
-                header_row = thead.find('tr')
-                if header_row:
-                    headers = [th.get_text(strip=True) for th in header_row.find_all('th')]
+            # Extract table headers with hardcoded mapping for empty columns
+            # Column mapping based on actual structure:
+            # Index 0: indicator (empty header)
+            # Index 1: last (header: "Last")
+            # Index 2: previous (header: "Previous")
+            # Index 3: highest (header: "Highest")
+            # Index 4: lowest (header: "Lowest")
+            # Index 5: unit (empty header)
+            # Index 6: date (empty header)
+            COLUMN_MAPPING = {
+                0: "indicator",
+                1: "last",
+                2: "previous",
+                3: "highest",
+                4: "lowest",
+                5: "unit",
+                6: "date"
+            }
 
-            if not headers:
-                logger.warning(f"No headers found in table for tab: {tab_name}")
+            thead = table.find('thead')
+            if not thead:
+                logger.warning(f"No thead found in table for tab: {tab_name}")
                 return []
 
-            logger.info(f"Found headers: {headers}")
+            header_row = thead.find('tr')
+            if not header_row:
+                logger.warning(f"No header row found in table for tab: {tab_name}")
+                return []
+
+            # Get column count
+            ths = header_row.find_all('th')
+            num_columns = len(ths)
+
+            if num_columns != 7:
+                logger.warning(f"Expected 7 columns but found {num_columns} in tab: {tab_name}")
+                # Still proceed, will use mapping
+
+            logger.info(f"Found {num_columns} columns in table for tab: {tab_name}")
 
             # Extract table rows
             tbody = table.find('tbody')
@@ -138,24 +163,31 @@ class TradingEconomicsScraper:
 
             for row in rows:
                 cells = row.find_all('td')
-                if len(cells) != len(headers):
-                    logger.debug(f"Skipping row with mismatched cell count: {len(cells)} vs {len(headers)}")
+                if len(cells) != num_columns:
+                    logger.debug(f"Skipping row with mismatched cell count: {len(cells)} vs {num_columns}")
                     continue
 
-                # Create indicator dict by mapping headers to cell values
+                # Create indicator dict by mapping column indices to field names
                 indicator_data = {}
-                for header, cell in zip(headers, cells):
+                for idx, cell in enumerate(cells):
                     # Get text, handle links
                     text = cell.get_text(strip=True)
-                    indicator_data[header.lower().replace(' ', '_')] = text
+
+                    # Use hardcoded mapping
+                    if idx in COLUMN_MAPPING:
+                        field_name = COLUMN_MAPPING[idx]
+                        indicator_data[field_name] = text
+                    else:
+                        # Fallback for unexpected columns
+                        indicator_data[f"column_{idx}"] = text
 
                 # Add metadata
                 indicator_data['country'] = self.country
                 indicator_data['tab_name'] = tab_name
                 indicator_data['scraped_at'] = datetime.now().isoformat()
 
-                # Generate unique hash
-                indicator_name = indicator_data.get(headers[0].lower().replace(' ', '_'), '')
+                # Generate unique hash using indicator name
+                indicator_name = indicator_data.get('indicator', '')
                 indicator_data['hash'] = self.generate_indicator_hash(
                     self.country,
                     tab_name,
@@ -326,11 +358,16 @@ Examples:
         first_indicators = all_data[first_tab][:3]
 
         for i, indicator in enumerate(first_indicators, 1):
-            print(f"{i}. Tab: {indicator.get('tab_name', 'N/A')}")
-            print(f"   Hash: {indicator.get('hash', 'N/A')}")
-            for key, value in indicator.items():
-                if key not in ['hash', 'tab_name', 'country', 'scraped_at']:
-                    print(f"   {key}: {value}")
+            print(f"{i}. Indicator: {indicator.get('indicator', 'N/A')}")
+            print(f"   Country: {indicator.get('country', 'N/A')}")
+            print(f"   Tab: {indicator.get('tab_name', 'N/A')}")
+            print(f"   Last: {indicator.get('last', 'N/A')}")
+            print(f"   Previous: {indicator.get('previous', 'N/A')}")
+            print(f"   Highest: {indicator.get('highest', 'N/A')}")
+            print(f"   Lowest: {indicator.get('lowest', 'N/A')}")
+            print(f"   Unit: {indicator.get('unit', 'N/A')}")
+            print(f"   Date: {indicator.get('date', 'N/A')}")
+            print(f"   Hash: {indicator.get('hash', 'N/A')[:20]}...")
             print()
 
     # Upload to MongoDB if flag is set
