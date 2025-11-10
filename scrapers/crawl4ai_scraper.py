@@ -397,10 +397,11 @@ Examples:
     articles = await scraper.scrape_multiple_pages(num_pages=args.pages, delay=args.delay)
 
     if articles:
-        # Save in multiple formats
-        json_filename = "moneycontrol_news_crawl4ai.json"
-        scraper.save_to_json(articles, json_filename)
-        scraper.save_to_csv(articles)
+        # Save to local files only if NOT uploading to MongoDB
+        if not args.upload_mongo:
+            json_filename = "moneycontrol_news_crawl4ai.json"
+            scraper.save_to_json(articles, json_filename)
+            scraper.save_to_csv(articles)
 
         # Print summary
         print(f"\n{'='*60}")
