@@ -89,8 +89,10 @@ python run_crawl4ai.py --help
 - `--pages N`: Number of pages to scrape (default: 3)
 - `--max-concurrent N`: Max concurrent detail page requests (default: 5)
 - `--delay SECONDS`: Delay between page requests (default: 2.0)
-- `--upload-mongo`: Upload results to MongoDB after scraping
+- `--upload-mongo`: Upload directly to MongoDB (skip local file saving)
 - `--no-details`: Skip fetching article details (faster, but no date/author/full_content)
+
+**Note:** Ketika menggunakan `--upload-mongo`, file JSON dan CSV **tidak akan disimpan** secara lokal. Data langsung di-upload ke MongoDB saja.
 
 **Option 2: Playwright**
 ```bash
