@@ -129,6 +129,18 @@ class MoneyControlCrawl4AIScraper:
                         # Extract just the date part (before '/')
                         date = date_text.split('/')[0].strip() if '/' in date_text else date_text
 
+                # Fallback for date: Try <p class="... date">
+                if not date:
+                    date_p = soup.find('p', class_=lambda x: x and 'date' in x)
+                    if date_p:
+                        # Get text directly from <p>, excluding text from child elements
+                        date_text = date_p.get_text(strip=True)
+                        # Remove time portion if present (e.g., "· 10:51 IST")
+                        if '·' in date_text:
+                            date = date_text.split('·')[0].strip()
+                        else:
+                            date = date_text
+
                 # Extract full content from <div class="content_wrapper arti-flow" id="contentdata">
                 full_content = ''
                 content_wrapper = soup.find('div', {'class': 'content_wrapper arti-flow', 'id': 'contentdata'})
