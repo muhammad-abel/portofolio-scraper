@@ -25,7 +25,8 @@ portofolio-scraper/
 │   ├── custom_scraper.py           # Template untuk custom website
 │   ├── json_output_examples.py     # Contoh berbagai format JSON output
 │   ├── memory_efficient_scraping.py # Memory optimization examples
-│   └── screener_output_example.json # Example screener output
+│   ├── screener_output_example.json # Example screener output (legacy)
+│   └── screener_output_example_hybrid.json # Example hybrid structure (NEW)
 ├── docs/                           # Documentation
 │   ├── SCRAPING_GUIDE.md           # Panduan lengkap web scraping
 │   ├── ERROR_HANDLING_GUIDE.md     # Troubleshooting & error handling
@@ -706,41 +707,84 @@ python run_screener.py --output nifty100_data.json
 
 ## 💾 Data Structure - Screener.in
 
+**Hybrid Structure**: Combines **computed summary fields** (quick access) + **raw table data** (complete for LLM analysis)
+
 ```json
 {
   "symbol": "HDFCBANK",
   "name": "HDFC Bank Ltd",
   "sector": "Banking",
   "current_price": 1645.50,
-  "market_cap": 1250000,
-  "pe_ratio": 18.5,
-  "pb_ratio": 2.8,
-  "roe": 16.5,
-  "roce": 8.2,
-  "shareholding": {
-    "latest_quarter": "Sep 2024",
-    "promoter": 26.5,
-    "fii": 45.2,  // ⭐ Key data!
-    "dii": 18.3,  // ⭐ Key data!
-    "fii_change_qoq": 1.2,  // ⭐ Very important!
-    "dii_change_qoq": -0.5,
-    "historical": [...]
-  },
-  "quarterly_results": [
-    {
+  "scraped_at": "2024-11-11T...",
+  "hash": "abc123...",
+
+  // ⭐ COMPUTED FIELDS (Quick Access)
+  "summary": {
+    "fundamentals": {
+      "market_cap": 1250000,
+      "pe_ratio": 18.5,
+      "pb_ratio": 2.8,
+      "roe": 16.5,
+      "roce": 8.2,
+      "debt_to_equity": 0.5,
+      "sales_growth": 18.5,
+      "profit_growth": 22.3
+    },
+    "latest_shareholding": {
       "quarter": "Sep 2024",
-      "revenue": 45000,
-      "profit": 12000,
+      "promoter": 26.5,
+      "fii": 45.2,              // ⭐ Key data!
+      "dii": 18.3,              // ⭐ Key data!
+      "fii_change_qoq": 1.2,    // ⭐ Very important!
+      "dii_change_qoq": -0.5,
+      "promoter_change_qoq": 0.0
+    },
+    "latest_quarter": {
+      "quarter": "Sep 2024",
+      "revenue": 450000000000.0,
+      "profit": 120000000000.0,
       "eps": 22.5,
-      "revenue_growth_yoy": 18.5,
+      "revenue_growth_yoy": 18.4,
       "profit_growth_yoy": 22.3
     },
+    "shareholding_historical": [...]  // Last 4 quarters
+  },
+
+  // 🗂️ RAW DATA (Complete Tables for LLM)
+  "fundamentals_raw": [
+    { "metric": "Market Cap", "value": "₹12,50,000 Cr" },
+    { "metric": "Stock P/E", "value": "18.5" },
+    { "metric": "ROE", "value": "16.5%" },
     ...
   ],
-  "scraped_at": "2024-11-11T...",
-  "hash": "abc123..."
+  "shareholding_raw": {
+    "headers": ["", "Sep 2024", "Jun 2024", "Mar 2024", "Dec 2023"],
+    "rows": [
+      { "label": "Promoters", "values": ["26.5%", "26.5%", "26.5%", "26.5%"] },
+      { "label": "FII", "values": ["45.2%", "44.0%", "43.5%", "42.8%"] },
+      { "label": "DII", "values": ["18.3%", "18.8%", "19.2%", "19.5%"] },
+      ...
+    ]
+  },
+  "quarterly_results_raw": {
+    "headers": ["", "Sep 2024", "Jun 2024", "Mar 2024", ...],
+    "rows": [
+      { "label": "Sales", "values": ["45,000", "42,000", "40,000", ...] },
+      { "label": "Net Profit", "values": ["12,000", "11,500", "11,000", ...] },
+      { "label": "EPS in Rs", "values": ["22.5", "21.8", "20.5", ...] },
+      ...
+    ]
+  },
+  "profit_loss_raw": { "headers": [...], "rows": [...] },
+  "balance_sheet_raw": { "headers": [...], "rows": [...] },
+  "cash_flow_raw": { "headers": [...], "rows": [...] }
 }
 ```
+
+**Why Hybrid Approach?**
+- ✅ **Computed fields**: Fast querying and filtering (e.g., "stocks with P/E < 20")
+- ✅ **Raw tables**: Complete data for LLM/RAG systems to analyze flexibly
+- ✅ **Best of both worlds**: Quick access + maximum flexibility
 
 ## 🎯 Usage Options
 

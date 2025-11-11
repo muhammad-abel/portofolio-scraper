@@ -99,6 +99,100 @@ class ScreenerScraper:
         except (ValueError, AttributeError):
             return None
 
+    def _extract_table_raw(self, table_element, include_header_row: bool = True) -> Dict:
+        """
+        Extract complete table data as-is (raw approach)
+
+        This method extracts the entire table without processing,
+        preserving all data for LLM analysis.
+
+        Args:
+            table_element: BeautifulSoup table element
+            include_header_row: Include header row in data
+
+        Returns:
+            Dictionary with headers and rows (all as strings)
+        """
+        table_data = {
+            "headers": [],
+            "rows": []
+        }
+
+        try:
+            # Extract headers
+            thead = table_element.find('thead')
+            if thead:
+                header_row = thead.find('tr')
+                if header_row:
+                    headers = header_row.find_all(['th', 'td'])
+                    table_data["headers"] = [h.get_text(strip=True) for h in headers]
+
+            # Extract all rows
+            tbody = table_element.find('tbody')
+            if tbody:
+                rows = tbody.find_all('tr')
+                for row in rows:
+                    cells = row.find_all(['td', 'th'])
+                    if cells:
+                        # Store as dict with first cell as key (metric name)
+                        row_data = {
+                            "label": cells[0].get_text(strip=True) if cells else "",
+                            "values": [cell.get_text(strip=True) for cell in cells[1:]]
+                        }
+                        table_data["rows"].append(row_data)
+
+        except Exception as e:
+            logger.debug(f"Error extracting raw table: {e}")
+
+        return table_data
+
+    def _extract_fundamentals_raw(self, soup: BeautifulSoup) -> List[Dict]:
+        """
+        Extract all fundamental metrics as-is (raw data)
+
+        Returns:
+            List of {metric, value} pairs
+        """
+        fundamentals_raw = []
+
+        try:
+            # Find all ratio/metric items (usually in list format)
+            ratio_items = soup.find_all('li', class_='flex')
+
+            for item in ratio_items:
+                spans = item.find_all('span')
+                if len(spans) >= 2:
+                    metric = spans[0].get_text(strip=True)
+                    value = spans[1].get_text(strip=True)
+
+                    fundamentals_raw.append({
+                        "metric": metric,
+                        "value": value
+                    })
+
+            # Alternative: Extract from top section with IDs
+            for metric_id in ['pe', 'pb', 'marketcap', 'roe', 'roce', 'bookvalue']:
+                elem = soup.find(id=metric_id)
+                if elem:
+                    # Try to find label
+                    parent = elem.find_parent()
+                    label_elem = parent.find('span', class_='name') if parent else None
+                    label = label_elem.get_text(strip=True) if label_elem else metric_id.upper()
+
+                    value = elem.get_text(strip=True)
+
+                    # Avoid duplicates
+                    if not any(f['metric'].lower() == label.lower() for f in fundamentals_raw):
+                        fundamentals_raw.append({
+                            "metric": label,
+                            "value": value
+                        })
+
+        except Exception as e:
+            logger.debug(f"Error extracting raw fundamentals: {e}")
+
+        return fundamentals_raw
+
     async def scrape_stock(self, symbol: str, crawler: AsyncWebCrawler) -> Optional[Dict]:
         """
         Scrape all data for a single stock
@@ -143,25 +237,96 @@ class ScreenerScraper:
                 stock_data = {
                     'symbol': symbol,
                     'scraped_at': datetime.now().isoformat(),
-                    'url': url
+                    'url': url,
+                    'hash': self.generate_stock_hash(symbol)
                 }
 
                 # Extract basic info
-                stock_data.update(self._extract_basic_info(soup, symbol))
+                basic_info = self._extract_basic_info(soup, symbol)
+                stock_data.update(basic_info)
 
-                # Extract fundamentals
-                stock_data.update(self._extract_fundamentals(soup))
+                # ====================
+                # COMPUTED FIELDS (Quick Access)
+                # ====================
+                stock_data['summary'] = {}
 
-                # Extract shareholding patterns
-                stock_data['shareholding'] = self._extract_shareholding(soup)
+                # Computed fundamentals
+                fundamentals_computed = self._extract_fundamentals(soup)
+                stock_data['summary']['fundamentals'] = fundamentals_computed
 
-                # Extract quarterly results
-                stock_data['quarterly_results'] = self._extract_quarterly_results(soup)
+                # Computed shareholding
+                shareholding_computed = self._extract_shareholding(soup)
+                if shareholding_computed:
+                    stock_data['summary']['latest_shareholding'] = {
+                        'quarter': shareholding_computed.get('latest_quarter'),
+                        'promoter': shareholding_computed.get('promoter'),
+                        'fii': shareholding_computed.get('fii'),
+                        'dii': shareholding_computed.get('dii'),
+                        'public': shareholding_computed.get('public'),
+                        'fii_change_qoq': shareholding_computed.get('fii_change_qoq'),
+                        'dii_change_qoq': shareholding_computed.get('dii_change_qoq'),
+                        'promoter_change_qoq': shareholding_computed.get('promoter_change_qoq')
+                    }
 
-                # Generate hash
-                stock_data['hash'] = self.generate_stock_hash(symbol)
+                # Computed quarterly results
+                quarterly_computed = self._extract_quarterly_results(soup)
+                if quarterly_computed and len(quarterly_computed) > 0:
+                    latest_quarter = quarterly_computed[0]
+                    stock_data['summary']['latest_quarter'] = {
+                        'quarter': latest_quarter.get('quarter'),
+                        'revenue': latest_quarter.get('revenue'),
+                        'profit': latest_quarter.get('profit'),
+                        'eps': latest_quarter.get('eps'),
+                        'revenue_growth_yoy': latest_quarter.get('revenue_growth_yoy'),
+                        'profit_growth_yoy': latest_quarter.get('profit_growth_yoy')
+                    }
 
-                logger.info(f"[SUCCESS] Scraped {symbol}")
+                # ====================
+                # RAW DATA (Complete Tables)
+                # ====================
+
+                # Raw fundamentals
+                stock_data['fundamentals_raw'] = self._extract_fundamentals_raw(soup)
+
+                # Raw shareholding table
+                shareholding_section = soup.find('section', id='shareholding')
+                if shareholding_section:
+                    shareholding_table = shareholding_section.find('table')
+                    if shareholding_table:
+                        stock_data['shareholding_raw'] = self._extract_table_raw(shareholding_table)
+                        # Also keep historical data from computed version
+                        if shareholding_computed and 'historical' in shareholding_computed:
+                            stock_data['summary']['shareholding_historical'] = shareholding_computed['historical']
+
+                # Raw quarterly results table
+                quarters_section = soup.find('section', id='quarters')
+                if quarters_section:
+                    quarters_table = quarters_section.find('table')
+                    if quarters_table:
+                        stock_data['quarterly_results_raw'] = self._extract_table_raw(quarters_table)
+
+                # Raw profit & loss table
+                profit_loss_section = soup.find('section', id='profit-loss')
+                if profit_loss_section:
+                    profit_loss_table = profit_loss_section.find('table')
+                    if profit_loss_table:
+                        stock_data['profit_loss_raw'] = self._extract_table_raw(profit_loss_table)
+
+                # Raw balance sheet table
+                balance_sheet_section = soup.find('section', id='balance-sheet')
+                if balance_sheet_section:
+                    balance_sheet_table = balance_sheet_section.find('table')
+                    if balance_sheet_table:
+                        stock_data['balance_sheet_raw'] = self._extract_table_raw(balance_sheet_table)
+
+                # Raw cash flow table
+                cash_flow_section = soup.find('section', id='cash-flow')
+                if cash_flow_section:
+                    cash_flow_table = cash_flow_section.find('table')
+                    if cash_flow_table:
+                        stock_data['cash_flow_raw'] = self._extract_table_raw(cash_flow_table)
+
+                logger.info(f"[SUCCESS] Scraped {symbol} with raw + computed data")
                 return stock_data
 
             except asyncio.TimeoutError:
