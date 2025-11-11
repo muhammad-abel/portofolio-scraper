@@ -823,16 +823,57 @@ python run_screener.py --symbols HDFCBANK,TCS,RELIANCE,INFY
 python run_screener.py --symbols-file data/my_stocks.json
 ```
 
+### Method 5: Upload to MongoDB (Real-time Streaming)
+```bash
+# Upload to MongoDB while scraping (memory-efficient)
+python scrapers/screener/screener_scraper.py \
+  --symbols-file data/nifty100_symbols.json \
+  --upload-mongodb
+
+# With custom MongoDB settings
+python scrapers/screener/screener_scraper.py \
+  --symbols HDFCBANK,TCS,RELIANCE \
+  --upload-mongodb \
+  --mongodb-uri "mongodb://localhost:27017/" \
+  --mongodb-db my_stocks_db \
+  --mongodb-collection nifty100 \
+  --mongodb-batch-size 50
+
+# Or use environment variables
+export MONGODB_URI="mongodb://localhost:27017/"
+export MONGODB_DB="screener_db"
+export MONGODB_COLLECTION="stocks"
+python scrapers/screener/screener_scraper.py \
+  --symbols-file data/nifty100_symbols.json \
+  --upload-mongodb
+```
+
+**MongoDB Features:**
+- ✅ **Real-time streaming**: Data uploaded as it's scraped (memory-efficient)
+- ✅ **Dual output**: Saves to both JSON file AND MongoDB simultaneously
+- ✅ **Automatic deduplication**: Uses hash-based upsert (no duplicates)
+- ✅ **Automatic indexing**: Creates indexes on hash, symbol, and scraped_at
+- ✅ **Batch operations**: Bulk writes for better performance
+- ✅ **Error handling**: Continues on failures, reports stats at the end
+
 ## ⚙️ Configuration
 
 **Available Options:**
 ```bash
+# Scraping options
 --symbols-file PATH      JSON file with stock symbols (default: data/nifty100_symbols.json)
 --symbols LIST           Comma-separated symbols (e.g., HDFCBANK,TCS)
 --method METHOD          Scraping method: standard, generator, batched (default: batched)
 --batch-size N           Batch size for batched method (default: 10)
 --delay SECONDS          Delay between stocks (default: 3.0)
 --output PATH            Output JSON file (default: screener_stocks.json)
+
+# MongoDB options
+--upload-mongodb              Enable MongoDB upload (streaming)
+--mongodb-uri URI            MongoDB connection URI (default: mongodb://localhost:27017/)
+--mongodb-db DB              Database name (default: screener_db)
+--mongodb-collection COLL    Collection name (default: stocks)
+--mongodb-batch-size N       Batch size for bulk writes (default: 50)
 ```
 
 ## ⚠️ Important Notes

@@ -29,6 +29,14 @@ from typing import List, Dict, Optional, AsyncIterator
 import argparse
 import re
 
+# Optional MongoDB support
+try:
+    from pymongo import MongoClient, UpdateOne
+    from pymongo.errors import BulkWriteError, ConnectionFailure
+    MONGODB_AVAILABLE = True
+except ImportError:
+    MONGODB_AVAILABLE = False
+
 # Logger will be configured in main()
 logger = None
 
@@ -730,6 +738,149 @@ class ScreenerScraper:
             raise
 
 
+class MongoDBUploader:
+    """Lightweight MongoDB uploader for streaming stock data"""
+
+    def __init__(self, connection_string: str, database_name: str, collection_name: str):
+        """
+        Initialize MongoDB uploader
+
+        Args:
+            connection_string: MongoDB connection string
+            database_name: Database name
+            collection_name: Collection name
+        """
+        if not MONGODB_AVAILABLE:
+            raise ImportError("pymongo is not installed. Run: pip install pymongo")
+
+        self.connection_string = connection_string
+        self.database_name = database_name
+        self.collection_name = collection_name
+        self.client = None
+        self.db = None
+        self.collection = None
+
+    def connect(self) -> bool:
+        """Connect to MongoDB"""
+        try:
+            logger.info(f"Connecting to MongoDB...")
+            self.client = MongoClient(self.connection_string, serverSelectionTimeoutMS=5000)
+
+            # Test connection
+            self.client.server_info()
+
+            self.db = self.client[self.database_name]
+            self.collection = self.db[self.collection_name]
+
+            logger.info(f"[SUCCESS] Connected to MongoDB: {self.database_name}.{self.collection_name}")
+            return True
+
+        except ConnectionFailure as e:
+            logger.error(f"[ERROR] Failed to connect to MongoDB: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"[ERROR] Unexpected error during connection: {e}")
+            return False
+
+    def create_indexes(self):
+        """Create indexes for better query performance"""
+        try:
+            logger.info("Creating MongoDB indexes...")
+
+            # Unique index on hash for deduplication
+            self.collection.create_index("hash", unique=True)
+
+            # Index on symbol for quick lookups
+            self.collection.create_index("symbol")
+
+            # Index on scraped_at for sorting
+            self.collection.create_index("scraped_at")
+
+            logger.info("[SUCCESS] MongoDB indexes created")
+
+        except Exception as e:
+            logger.warning(f"[WARNING] Failed to create indexes: {e}")
+
+    async def upload_streaming(
+        self,
+        data_async_iterator: AsyncIterator,
+        batch_size: int = 50,
+        upsert: bool = True
+    ) -> Dict[str, int]:
+        """
+        Upload stocks to MongoDB using streaming (memory-efficient)
+
+        Args:
+            data_async_iterator: Async iterator yielding stock data
+            batch_size: Number of stocks per batch
+            upsert: If True, update existing records
+
+        Returns:
+            Dictionary with upload statistics
+        """
+        stats = {
+            "inserted": 0,
+            "updated": 0,
+            "failed": 0
+        }
+
+        operations = []
+        total_processed = 0
+
+        try:
+            logger.info(f"[MONGODB] Starting streaming upload (batch_size={batch_size})...")
+
+            async for stock_data in data_async_iterator:
+                # Create upsert operation based on hash
+                filter_key = {"hash": stock_data["hash"]}
+
+                operations.append(
+                    UpdateOne(
+                        filter_key,
+                        {"$set": stock_data},
+                        upsert=upsert
+                    )
+                )
+
+                # Flush batch when full
+                if len(operations) >= batch_size:
+                    result = self.collection.bulk_write(operations, ordered=False)
+                    stats["inserted"] += result.upserted_count
+                    stats["updated"] += result.modified_count
+                    total_processed += len(operations)
+
+                    logger.info(f"[MONGODB] Uploaded batch: {len(operations)} operations (total: {total_processed})")
+                    operations = []
+
+            # Flush remaining operations
+            if operations:
+                result = self.collection.bulk_write(operations, ordered=False)
+                stats["inserted"] += result.upserted_count
+                stats["updated"] += result.modified_count
+                total_processed += len(operations)
+
+                logger.info(f"[MONGODB] Uploaded final batch: {len(operations)} operations")
+
+            logger.info(f"[MONGODB] Completed: {total_processed} total stocks")
+            logger.info(f"  - Inserted: {stats['inserted']}")
+            logger.info(f"  - Updated: {stats['updated']}")
+
+        except BulkWriteError as e:
+            logger.error(f"[ERROR] Bulk write error: {e.details}")
+            stats["failed"] = len(operations)
+        except Exception as e:
+            logger.error(f"[ERROR] MongoDB upload failed: {e}")
+            stats["failed"] = len(operations)
+
+        return stats
+
+    def close(self):
+        """Close MongoDB connection"""
+        if self.client:
+            self.client.close()
+            logger.info("MongoDB connection closed")
+
+
 async def main():
     """Main execution function"""
     parser = argparse.ArgumentParser(
@@ -737,9 +888,22 @@ async def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Scrape to JSON file
   python scrapers/screener/screener_scraper.py --symbols-file data/nifty100_symbols.json
+
+  # Scrape specific symbols
   python scrapers/screener/screener_scraper.py --symbols HDFCBANK,TCS,RELIANCE
+
+  # Scrape with custom batch size
   python scrapers/screener/screener_scraper.py --symbols-file data/nifty100_symbols.json --batch-size 20
+
+  # Scrape and upload to MongoDB (streaming)
+  python scrapers/screener/screener_scraper.py --symbols-file data/nifty100_symbols.json --upload-mongodb
+
+  # Scrape to MongoDB with custom settings
+  python scrapers/screener/screener_scraper.py --symbols HDFCBANK,TCS,RELIANCE \
+    --upload-mongodb --mongodb-uri mongodb://localhost:27017/ \
+    --mongodb-db my_stocks_db --mongodb-collection nifty100
         """
     )
     parser.add_argument(
@@ -776,6 +940,37 @@ Examples:
         default='batched',
         choices=['standard', 'generator', 'batched'],
         help='Scraping method (default: batched)'
+    )
+
+    # MongoDB upload options
+    parser.add_argument(
+        '--upload-mongodb',
+        action='store_true',
+        help='Upload data to MongoDB in real-time (streaming)'
+    )
+    parser.add_argument(
+        '--mongodb-uri',
+        type=str,
+        default=os.getenv('MONGODB_URI', 'mongodb://localhost:27017/'),
+        help='MongoDB connection URI (default: mongodb://localhost:27017/)'
+    )
+    parser.add_argument(
+        '--mongodb-db',
+        type=str,
+        default=os.getenv('MONGODB_DB', 'screener_db'),
+        help='MongoDB database name (default: screener_db)'
+    )
+    parser.add_argument(
+        '--mongodb-collection',
+        type=str,
+        default=os.getenv('MONGODB_COLLECTION', 'stocks'),
+        help='MongoDB collection name (default: stocks)'
+    )
+    parser.add_argument(
+        '--mongodb-batch-size',
+        type=int,
+        default=50,
+        help='MongoDB batch size for bulk operations (default: 50)'
     )
 
     args = parser.parse_args()
@@ -824,43 +1019,153 @@ Examples:
 
     logger.info(f"Starting Screener.in scraper for {len(symbols)} stocks")
     logger.info(f"Method: {args.method}, Delay: {args.delay}s")
+    if args.upload_mongodb:
+        logger.info(f"MongoDB upload: ENABLED")
 
-    # Scrape based on method
-    if args.method == 'generator':
-        # Generator method - streaming save
-        generator = scraper.scrape_stocks_generator(symbols, delay=args.delay)
-        await scraper.save_to_json_streaming(generator, args.output)
+    # Initialize MongoDB uploader if needed
+    mongo_uploader = None
+    if args.upload_mongodb:
+        if not MONGODB_AVAILABLE:
+            logger.error("MongoDB upload requested but pymongo is not installed!")
+            logger.error("Install it with: pip install pymongo")
+            return
 
-    elif args.method == 'batched':
-        # Batched method
-        all_stocks = []
-        async for batch in scraper.scrape_stocks_batched(
-            symbols,
-            batch_size=args.batch_size,
-            delay=args.delay
-        ):
-            all_stocks.extend(batch)
-            logger.info(f"Progress: {len(all_stocks)}/{len(symbols)} stocks scraped")
+        mongo_uploader = MongoDBUploader(
+            connection_string=args.mongodb_uri,
+            database_name=args.mongodb_db,
+            collection_name=args.mongodb_collection
+        )
 
-        scraper.save_to_json(all_stocks, args.output)
+        if not mongo_uploader.connect():
+            logger.error("Failed to connect to MongoDB. Exiting...")
+            return
 
-    else:
-        # Standard method (not recommended for large lists)
-        logger.warning("Standard method loads all data in memory - use generator or batched for large lists")
-        all_stocks = []
-        async with AsyncWebCrawler(verbose=True) as crawler:
-            for symbol in symbols:
-                stock_data = await scraper.scrape_stock(symbol, crawler)
-                if stock_data:
-                    all_stocks.append(stock_data)
-                await asyncio.sleep(args.delay)
+        mongo_uploader.create_indexes()
 
-        scraper.save_to_json(all_stocks, args.output)
+    try:
+        # Scrape based on method
+        if args.upload_mongodb:
+            # Use generator method for streaming upload to MongoDB + JSON
+            logger.info("Using generator method for MongoDB streaming upload...")
 
-    print(f"\n{'='*70}")
-    print(f"Scraping completed!")
-    print(f"Output: {args.output}")
-    print(f"{'='*70}\n")
+            # Create async generator wrapper for dual output
+            async def dual_output_processor():
+                """Process each stock data to both MongoDB and JSON"""
+                stats = {
+                    "inserted": 0,
+                    "updated": 0,
+                    "failed": 0
+                }
+                operations = []
+
+                # Open JSON file for streaming write
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    f.write('[\n')
+                    first = True
+                    total = 0
+
+                    async for stock_data in scraper.scrape_stocks_generator(symbols, delay=args.delay):
+                        # Write to JSON
+                        if not first:
+                            f.write(',\n')
+                        first = False
+
+                        json_str = json.dumps(stock_data, ensure_ascii=False, indent=2)
+                        lines = json_str.split('\n')
+                        indented = '\n'.join('  ' + line for line in lines)
+                        f.write(indented)
+                        total += 1
+
+                        # Add to MongoDB batch
+                        filter_key = {"hash": stock_data["hash"]}
+                        operations.append(
+                            UpdateOne(
+                                filter_key,
+                                {"$set": stock_data},
+                                upsert=True
+                            )
+                        )
+
+                        # Flush MongoDB batch when full
+                        if len(operations) >= args.mongodb_batch_size:
+                            try:
+                                result = mongo_uploader.collection.bulk_write(operations, ordered=False)
+                                stats["inserted"] += result.upserted_count
+                                stats["updated"] += result.modified_count
+                                logger.info(f"[MONGODB] Uploaded batch: {len(operations)} operations")
+                                operations = []
+                            except BulkWriteError as e:
+                                logger.error(f"[ERROR] Bulk write error: {e.details}")
+                                stats["failed"] += len(operations)
+                                operations = []
+
+                    # Flush remaining MongoDB operations
+                    if operations:
+                        try:
+                            result = mongo_uploader.collection.bulk_write(operations, ordered=False)
+                            stats["inserted"] += result.upserted_count
+                            stats["updated"] += result.modified_count
+                            logger.info(f"[MONGODB] Uploaded final batch: {len(operations)} operations")
+                        except BulkWriteError as e:
+                            logger.error(f"[ERROR] Bulk write error: {e.details}")
+                            stats["failed"] += len(operations)
+
+                    # Close JSON array
+                    f.write('\n]')
+                    logger.info(f"[STREAMING] Saved {total} stocks to {args.output}")
+
+                return stats
+
+            # Execute dual output
+            mongo_stats = await dual_output_processor()
+
+            logger.info(f"\n[MONGODB STATS]")
+            logger.info(f"  - Inserted: {mongo_stats['inserted']}")
+            logger.info(f"  - Updated: {mongo_stats['updated']}")
+            logger.info(f"  - Failed: {mongo_stats['failed']}")
+
+        elif args.method == 'generator':
+            # Generator method - streaming save to JSON only
+            generator = scraper.scrape_stocks_generator(symbols, delay=args.delay)
+            await scraper.save_to_json_streaming(generator, args.output)
+
+        elif args.method == 'batched':
+            # Batched method - load all in memory
+            all_stocks = []
+            async for batch in scraper.scrape_stocks_batched(
+                symbols,
+                batch_size=args.batch_size,
+                delay=args.delay
+            ):
+                all_stocks.extend(batch)
+                logger.info(f"Progress: {len(all_stocks)}/{len(symbols)} stocks scraped")
+
+            scraper.save_to_json(all_stocks, args.output)
+
+        else:
+            # Standard method (not recommended for large lists)
+            logger.warning("Standard method loads all data in memory - use generator or batched for large lists")
+            all_stocks = []
+            async with AsyncWebCrawler(verbose=True) as crawler:
+                for symbol in symbols:
+                    stock_data = await scraper.scrape_stock(symbol, crawler)
+                    if stock_data:
+                        all_stocks.append(stock_data)
+                    await asyncio.sleep(args.delay)
+
+            scraper.save_to_json(all_stocks, args.output)
+
+        print(f"\n{'='*70}")
+        print(f"Scraping completed!")
+        print(f"Output: {args.output}")
+        if args.upload_mongodb:
+            print(f"MongoDB: {args.mongodb_db}.{args.mongodb_collection}")
+        print(f"{'='*70}\n")
+
+    finally:
+        # Close MongoDB connection
+        if mongo_uploader:
+            mongo_uploader.close()
 
 
 if __name__ == "__main__":
