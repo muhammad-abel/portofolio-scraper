@@ -375,6 +375,14 @@ pip install -r requirements.txt --upgrade
   - Retry mechanism
   - Configuration options
 
+- **`docs/MEMORY_OPTIMIZATION.md`** - Memory optimization guide (NEW!)
+  - Why memory optimization matters
+  - Generator vs Batched vs Standard methods
+  - Memory usage comparison
+  - Usage examples & best practices
+  - Performance profiling tools
+  - Migration guide
+
 ## 🎓 Examples
 
 ### Custom Scraper untuk Website Lain
@@ -488,6 +496,46 @@ from scrapers import EnhancedMoneyControlScraper
 scraper = EnhancedMoneyControlScraper()
 articles = await scraper.scrape_all_pages()  # Otomatis detect & scrape semua
 ```
+
+### 🧠 Memory Optimization (NEW!)
+
+**For large-scale scraping (>100 pages), use memory-efficient methods:**
+
+```python
+# ✅ Generator method (recommended for large jobs)
+# Memory usage stays constant regardless of page count
+async for articles in scraper.scrape_pages_generator(num_pages=500):
+    scraper.save_to_json(articles, f"page_{i}.json")
+    # Memory freed after each iteration
+
+# ✅ Batched method (balance between memory & convenience)
+async for batch in scraper.scrape_pages_batched(
+    num_pages=500,
+    batch_size=50
+):
+    scraper.save_to_json(batch, f"batch_{i}.json")
+
+# ✅ Streaming JSON save (single file, minimal memory)
+generator = scraper.scrape_pages_generator(num_pages=500)
+await scraper.save_to_json_streaming(generator, "output.json")
+
+# ✅ Direct MongoDB upload (memory-efficient)
+from upload_to_mongodb import MongoDBUploader
+uploader = MongoDBUploader(...)
+generator = scraper.scrape_pages_generator(num_pages=1000)
+await uploader.upload_articles_streaming_async(generator)
+```
+
+**Memory Profiling Tool:**
+```bash
+# Compare memory usage of different methods
+python tools/memory_profiler.py --pages 100 --method compare
+
+# Test specific method
+python tools/memory_profiler.py --pages 500 --method generator
+```
+
+**📖 Full guide:** See [docs/MEMORY_OPTIMIZATION.md](docs/MEMORY_OPTIMIZATION.md) for complete documentation.
 
 ---
 

@@ -296,6 +296,188 @@ class MongoDBUploader:
             logger.error(f"[ERROR] Failed to get collection stats: {e}")
             return {}
 
+    def upload_articles_streaming(
+        self,
+        articles_iterator,
+        batch_size: int = 100,
+        upsert: bool = True
+    ) -> Dict[str, int]:
+        """
+        Upload articles to MongoDB in batches using streaming (memory-efficient)
+
+        This method processes articles from an iterator/generator in batches,
+        uploading each batch immediately without accumulating all data in memory.
+
+        Args:
+            articles_iterator: Iterator/generator of article lists or single articles
+            batch_size: Number of articles per batch for bulk write (default: 100)
+            upsert: If True, update existing articles; if False, skip duplicates
+
+        Returns:
+            Dictionary with upload statistics
+
+        Example:
+            >>> uploader = MongoDBUploader(...)
+            >>> # Sync iterator
+            >>> def article_generator():
+            ...     for batch in batches:
+            ...         yield batch
+            >>> stats = uploader.upload_articles_streaming(article_generator(), batch_size=100)
+        """
+        stats = {
+            "inserted": 0,
+            "updated": 0,
+            "skipped": 0,
+            "failed": 0
+        }
+
+        operations = []
+        total_processed = 0
+
+        try:
+            logger.info(f"[STREAMING] Starting streaming upload (batch_size={batch_size})...")
+
+            for batch in articles_iterator:
+                # Handle both List[Dict] and Dict
+                if isinstance(batch, dict):
+                    batch = [batch]
+
+                for article in batch:
+                    # Create upsert operation based on hash
+                    filter_key = {"hash": article["hash"]} if "hash" in article else {"url": article["url"]}
+
+                    operations.append(
+                        UpdateOne(
+                            filter_key,
+                            {"$set": article},
+                            upsert=upsert
+                        )
+                    )
+
+                    # Flush batch when full
+                    if len(operations) >= batch_size:
+                        result = self.collection.bulk_write(operations, ordered=False)
+                        stats["inserted"] += result.upserted_count
+                        stats["updated"] += result.modified_count
+                        total_processed += len(operations)
+
+                        logger.info(f"[STREAMING] Uploaded batch: {len(operations)} operations (total: {total_processed})")
+
+                        # Clear operations to free memory
+                        operations = []
+
+            # Flush remaining operations
+            if operations:
+                result = self.collection.bulk_write(operations, ordered=False)
+                stats["inserted"] += result.upserted_count
+                stats["updated"] += result.modified_count
+                total_processed += len(operations)
+
+                logger.info(f"[STREAMING] Uploaded final batch: {len(operations)} operations")
+
+            logger.info(f"[STREAMING] Completed: {total_processed} total operations")
+            logger.info(f"  - Inserted: {stats['inserted']}")
+            logger.info(f"  - Updated: {stats['updated']}")
+
+        except BulkWriteError as e:
+            logger.error(f"[ERROR] Bulk write error: {e.details}")
+            stats["failed"] = len(operations)
+        except Exception as e:
+            logger.error(f"[ERROR] Streaming upload failed: {e}")
+            stats["failed"] = len(operations)
+
+        return stats
+
+    async def upload_articles_streaming_async(
+        self,
+        articles_async_iterator,
+        batch_size: int = 100,
+        upsert: bool = True
+    ) -> Dict[str, int]:
+        """
+        Upload articles to MongoDB in batches using async streaming (memory-efficient)
+
+        Async version of upload_articles_streaming for use with async generators.
+
+        Args:
+            articles_async_iterator: Async iterator/generator of article lists
+            batch_size: Number of articles per batch for bulk write (default: 100)
+            upsert: If True, update existing articles; if False, skip duplicates
+
+        Returns:
+            Dictionary with upload statistics
+
+        Example:
+            >>> uploader = MongoDBUploader(...)
+            >>> async def scrape_and_upload():
+            ...     scraper = MoneyControlCrawl4AIScraper()
+            ...     generator = scraper.scrape_pages_generator(num_pages=100)
+            ...     stats = await uploader.upload_articles_streaming_async(generator)
+        """
+        stats = {
+            "inserted": 0,
+            "updated": 0,
+            "skipped": 0,
+            "failed": 0
+        }
+
+        operations = []
+        total_processed = 0
+
+        try:
+            logger.info(f"[STREAMING] Starting async streaming upload (batch_size={batch_size})...")
+
+            async for batch in articles_async_iterator:
+                # Handle both List[Dict] and Dict
+                if isinstance(batch, dict):
+                    batch = [batch]
+
+                for article in batch:
+                    # Create upsert operation based on hash
+                    filter_key = {"hash": article["hash"]} if "hash" in article else {"url": article["url"]}
+
+                    operations.append(
+                        UpdateOne(
+                            filter_key,
+                            {"$set": article},
+                            upsert=upsert
+                        )
+                    )
+
+                    # Flush batch when full
+                    if len(operations) >= batch_size:
+                        result = self.collection.bulk_write(operations, ordered=False)
+                        stats["inserted"] += result.upserted_count
+                        stats["updated"] += result.modified_count
+                        total_processed += len(operations)
+
+                        logger.info(f"[STREAMING] Uploaded batch: {len(operations)} operations (total: {total_processed})")
+
+                        # Clear operations to free memory
+                        operations = []
+
+            # Flush remaining operations
+            if operations:
+                result = self.collection.bulk_write(operations, ordered=False)
+                stats["inserted"] += result.upserted_count
+                stats["updated"] += result.modified_count
+                total_processed += len(operations)
+
+                logger.info(f"[STREAMING] Uploaded final batch: {len(operations)} operations")
+
+            logger.info(f"[STREAMING] Completed: {total_processed} total operations")
+            logger.info(f"  - Inserted: {stats['inserted']}")
+            logger.info(f"  - Updated: {stats['updated']}")
+
+        except BulkWriteError as e:
+            logger.error(f"[ERROR] Bulk write error: {e.details}")
+            stats["failed"] = len(operations)
+        except Exception as e:
+            logger.error(f"[ERROR] Async streaming upload failed: {e}")
+            stats["failed"] = len(operations)
+
+        return stats
+
     def close(self):
         """Close MongoDB connection"""
         if self.client:

@@ -387,6 +387,11 @@ class MoneyControlCrawl4AIScraper:
 
         Returns:
             List of all article dictionaries
+
+        Warning:
+            This method accumulates all articles in memory. For large-scale scraping
+            (>100 pages), consider using scrape_pages_generator() or scrape_pages_batched()
+            to avoid memory issues.
         """
         all_articles = []
 
@@ -402,6 +407,98 @@ class MoneyControlCrawl4AIScraper:
 
         logger.info(f"Total articles scraped: {len(all_articles)}")
         return all_articles
+
+    async def scrape_pages_generator(self, num_pages: int = 1, delay: float = 2.0):
+        """
+        Memory-efficient generator that yields articles page by page
+
+        This method doesn't accumulate all articles in memory. Instead,
+        it yields each page's articles immediately, allowing the caller
+        to process/save them incrementally.
+
+        Args:
+            num_pages: Number of pages to scrape
+            delay: Delay between page requests (seconds)
+
+        Yields:
+            List of articles for each page
+
+        Example:
+            >>> scraper = MoneyControlCrawl4AIScraper()
+            >>> page_num = 1
+            >>> async for articles in scraper.scrape_pages_generator(num_pages=100):
+            ...     scraper.save_to_json(articles, f"page_{page_num}.json")
+            ...     page_num += 1
+            ...     # Memory for this page is freed after processing
+        """
+        for page in range(1, num_pages + 1):
+            logger.info(f"[MEMORY-EFFICIENT] Scraping page {page}/{num_pages}")
+            articles = await self.scrape_page(page)
+
+            if articles:
+                logger.info(f"[MEMORY-EFFICIENT] Yielding {len(articles)} articles from page {page}")
+                yield articles
+            else:
+                logger.warning(f"[MEMORY-EFFICIENT] No articles found on page {page}")
+
+            # Be polite - add delay between requests
+            if page < num_pages:
+                logger.debug(f"Waiting {delay} seconds before next page...")
+                await asyncio.sleep(delay)
+
+        logger.info(f"[MEMORY-EFFICIENT] Generator completed for {num_pages} pages")
+
+    async def scrape_pages_batched(self, num_pages: int = 1, batch_size: int = 10, delay: float = 2.0):
+        """
+        Memory-efficient batched scraping
+
+        Scrapes pages in batches and yields each batch separately.
+        This is useful for writing batches to disk or uploading to database
+        without accumulating all data in memory.
+
+        Args:
+            num_pages: Total number of pages to scrape
+            batch_size: Number of pages per batch (default: 10)
+            delay: Delay between page requests (seconds)
+
+        Yields:
+            List of articles for each batch
+
+        Example:
+            >>> scraper = MoneyControlCrawl4AIScraper()
+            >>> batch_num = 0
+            >>> async for batch_articles in scraper.scrape_pages_batched(
+            ...     num_pages=500, batch_size=50
+            ... ):
+            ...     scraper.save_to_json(batch_articles, f"batch_{batch_num}.json")
+            ...     batch_num += 1
+        """
+        batch_articles = []
+        pages_in_current_batch = 0
+
+        for page in range(1, num_pages + 1):
+            logger.info(f"[BATCH] Scraping page {page}/{num_pages} (batch progress: {pages_in_current_batch + 1}/{batch_size})")
+            articles = await self.scrape_page(page)
+
+            if articles:
+                batch_articles.extend(articles)
+                pages_in_current_batch += 1
+
+            # Yield batch when full or at the last page
+            if pages_in_current_batch >= batch_size or page == num_pages:
+                if batch_articles:
+                    logger.info(f"[BATCH] Yielding batch with {len(batch_articles)} articles ({pages_in_current_batch} pages)")
+                    yield batch_articles
+
+                    # Clear batch to free memory
+                    batch_articles = []
+                    pages_in_current_batch = 0
+
+            # Be polite - add delay between requests
+            if page < num_pages:
+                await asyncio.sleep(delay)
+
+        logger.info(f"[BATCH] Completed batched scraping for {num_pages} pages")
 
     def save_to_json(self, articles: List[Dict], filename: str = "moneycontrol_news_crawl4ai.json"):
         """Save articles to JSON file"""
@@ -429,6 +526,106 @@ class MoneyControlCrawl4AIScraper:
             logger.info(f"Saved {len(articles)} articles to {filename}")
         except Exception as e:
             logger.error(f"Error saving to Excel: {str(e)}")
+
+    async def save_to_json_streaming(
+        self,
+        articles_async_iterator,
+        filename: str,
+        pretty: bool = True
+    ):
+        """
+        Save articles to JSON using streaming (memory-efficient)
+
+        This method writes JSON incrementally as articles come in from a generator,
+        instead of loading everything into memory before writing.
+
+        Args:
+            articles_async_iterator: Async iterator/generator of article lists
+            filename: Output filename
+            pretty: Whether to use pretty formatting with indentation
+
+        Example:
+            >>> scraper = MoneyControlCrawl4AIScraper()
+            >>> generator = scraper.scrape_pages_generator(num_pages=100)
+            >>> await scraper.save_to_json_streaming(generator, "output.json")
+        """
+        try:
+            indent = 2 if pretty else None
+
+            with open(filename, 'w', encoding='utf-8') as f:
+                f.write('[\n' if pretty else '[')
+
+                first_article = True
+                total_articles = 0
+
+                async for batch in articles_async_iterator:
+                    # Handle both List[Dict] and Dict
+                    if isinstance(batch, dict):
+                        batch = [batch]
+
+                    for article in batch:
+                        if not first_article:
+                            f.write(',\n' if pretty else ',')
+                        first_article = False
+
+                        json_str = json.dumps(article, ensure_ascii=False, indent=indent)
+
+                        if pretty:
+                            # Add indentation to each line
+                            lines = json_str.split('\n')
+                            indented = '\n'.join('  ' + line for line in lines)
+                            f.write(indented)
+                        else:
+                            f.write(json_str)
+
+                        total_articles += 1
+
+                f.write('\n]' if pretty else ']')
+
+            logger.info(f"[STREAMING] Saved {total_articles} articles to {filename}")
+
+        except Exception as e:
+            logger.error(f"[STREAMING] Error saving to JSON: {str(e)}")
+            raise
+
+    @staticmethod
+    def merge_json_files(input_files: List[str], output_file: str):
+        """
+        Merge multiple JSON files into one
+
+        Useful when you've saved batches separately and want to combine them.
+
+        Args:
+            input_files: List of input JSON filenames
+            output_file: Output filename for merged JSON
+
+        Example:
+            >>> files = ["batch_0.json", "batch_1.json", "batch_2.json"]
+            >>> MoneyControlCrawl4AIScraper.merge_json_files(files, "merged.json")
+        """
+        try:
+            from pathlib import Path
+
+            all_articles = []
+
+            for input_file in input_files:
+                if not Path(input_file).exists():
+                    logger.warning(f"[MERGE] File not found, skipping: {input_file}")
+                    continue
+
+                with open(input_file, 'r', encoding='utf-8') as f:
+                    articles = json.load(f)
+                    all_articles.extend(articles)
+                    logger.info(f"[MERGE] Loaded {len(articles)} articles from {input_file}")
+
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(all_articles, f, ensure_ascii=False, indent=2)
+
+            logger.info(f"[MERGE] Merged {len(all_articles)} articles into {output_file}")
+
+        except Exception as e:
+            logger.error(f"[MERGE] Error merging JSON files: {str(e)}")
+            raise
 
 
 async def main():
