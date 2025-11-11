@@ -750,7 +750,7 @@ python run_screener.py --output nifty100_data.json
     "shareholding_historical": [...]  // Last 4 quarters
   },
 
-  // 🗂️ RAW DATA (Complete Tables for LLM)
+  // 🗂️ RAW DATA (Dict-by-Date Format for RAG/LLM)
   "fundamentals_raw": [
     { "metric": "Market Cap", "value": "₹12,50,000 Cr" },
     { "metric": "Stock P/E", "value": "18.5" },
@@ -758,32 +758,41 @@ python run_screener.py --output nifty100_data.json
     ...
   ],
   "shareholding_raw": {
-    "headers": ["", "Sep 2024", "Jun 2024", "Mar 2024", "Dec 2023"],
-    "rows": [
-      { "label": "Promoters", "values": ["26.5%", "26.5%", "26.5%", "26.5%"] },
-      { "label": "FII", "values": ["45.2%", "44.0%", "43.5%", "42.8%"] },
-      { "label": "DII", "values": ["18.3%", "18.8%", "19.2%", "19.5%"] },
-      ...
-    ]
+    "Sep 2024": { "promoters": "26.5%", "fii": "45.2%", "dii": "18.3%", "public": "10.0%" },
+    "Jun 2024": { "promoters": "26.5%", "fii": "44.0%", "dii": "18.8%", "public": "10.7%" },
+    "Mar 2024": { "promoters": "26.5%", "fii": "43.5%", "dii": "19.2%", "public": "10.8%" },
+    ...
   },
   "quarterly_results_raw": {
-    "headers": ["", "Sep 2024", "Jun 2024", "Mar 2024", ...],
-    "rows": [
-      { "label": "Sales", "values": ["45,000", "42,000", "40,000", ...] },
-      { "label": "Net Profit", "values": ["12,000", "11,500", "11,000", ...] },
-      { "label": "EPS in Rs", "values": ["22.5", "21.8", "20.5", ...] },
-      ...
-    ]
+    "Sep 2024": { "sales": "45,000", "net_profit": "12,000", "eps_in_rs": "22.5", ... },
+    "Jun 2024": { "sales": "42,000", "net_profit": "11,500", "eps_in_rs": "21.8", ... },
+    "Mar 2024": { "sales": "40,000", "net_profit": "11,000", "eps_in_rs": "20.5", ... },
+    ...
   },
-  "profit_loss_raw": { "headers": [...], "rows": [...] },
-  "balance_sheet_raw": { "headers": [...], "rows": [...] },
-  "cash_flow_raw": { "headers": [...], "rows": [...] }
+  "profit_loss_raw": {
+    "Mar 2024": { "sales": "1,80,000", "expenses": "1,30,000", ... },
+    "Mar 2023": { "sales": "1,60,000", "expenses": "1,15,000", ... },
+    ...
+  },
+  "balance_sheet_raw": {
+    "Mar 2024": { "equity_capital": "534", "reserves": "2,40,000", ... },
+    "Mar 2023": { "equity_capital": "534", "reserves": "2,20,000", ... },
+    ...
+  },
+  "cash_flow_raw": {
+    "Mar 2024": { "cash_from_operating_activity": "55,000", ... },
+    "Mar 2023": { "cash_from_operating_activity": "50,000", ... },
+    ...
+  }
 }
 ```
 
 **Why Hybrid Approach?**
 - ✅ **Computed fields**: Fast querying and filtering (e.g., "stocks with P/E < 20")
-- ✅ **Raw tables**: Complete data for LLM/RAG systems to analyze flexibly
+- ✅ **Dict-by-date raw tables**: RAG/LLM-friendly format with O(1) lookups
+  - Easy access: `data["Sep 2024"]["revenue"]`
+  - Clear context for LLMs: "Sep 2024 profit is 18,627"
+  - No complex array indexing needed
 - ✅ **Best of both worlds**: Quick access + maximum flexibility
 
 ## 🎯 Usage Options

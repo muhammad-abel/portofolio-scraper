@@ -72,169 +72,207 @@
     ],
 
     "shareholding_raw": {
-      "headers": ["", "Sep 2024", "Jun 2024", "Mar 2024", "Dec 2023"],
-      "rows": [
-        {
-          "label": "Promoters",
-          "values": ["26.5%", "26.5%", "26.5%", "26.5%"]
-        },
-        {
-          "label": "FII",
-          "values": ["45.2%", "44.0%", "43.5%", "42.8%"]
-        },
-        {
-          "label": "DII",
-          "values": ["18.3%", "18.8%", "19.2%", "19.5%"]
-        },
-        {
-          "label": "Public",
-          "values": ["10.0%", "10.7%", "10.8%", "11.2%"]
-        }
-      ]
+      "Sep 2024": {
+        "promoters": "26.5%",
+        "fii": "45.2%",
+        "dii": "18.3%",
+        "public": "10.0%"
+      },
+      "Jun 2024": {
+        "promoters": "26.5%",
+        "fii": "44.0%",
+        "dii": "18.8%",
+        "public": "10.7%"
+      },
+      "Mar 2024": {
+        "promoters": "26.5%",
+        "fii": "43.5%",
+        "dii": "19.2%",
+        "public": "10.8%"
+      },
+      "Dec 2023": {
+        "promoters": "26.5%",
+        "fii": "42.8%",
+        "dii": "19.5%",
+        "public": "11.2%"
+      }
     },
 
     "quarterly_results_raw": {
-      "headers": ["", "Sep 2024", "Jun 2024", "Mar 2024", "Dec 2023", "Sep 2023", "Jun 2023"],
-      "rows": [
-        {
-          "label": "Sales",
-          "values": ["45,000", "42,000", "40,000", "38,000", "38,000", "35,000"]
-        },
-        {
-          "label": "Expenses",
-          "values": ["33,000", "31,500", "30,000", "28,500", "28,800", "26,500"]
-        },
-        {
-          "label": "Operating Profit",
-          "values": ["12,000", "10,500", "10,000", "9,500", "9,200", "8,500"]
-        },
-        {
-          "label": "OPM %",
-          "values": ["26.7", "25.0", "25.0", "25.0", "24.2", "24.3"]
-        },
-        {
-          "label": "Other Income",
-          "values": ["500", "450", "400", "380", "350", "320"]
-        },
-        {
-          "label": "Interest",
-          "values": ["800", "750", "700", "680", "650", "600"]
-        },
-        {
-          "label": "Depreciation",
-          "values": ["200", "180", "170", "160", "150", "140"]
-        },
-        {
-          "label": "Profit before tax",
-          "values": ["11,500", "10,020", "9,530", "9,040", "8,750", "8,080"]
-        },
-        {
-          "label": "Tax %",
-          "values": ["25.2", "25.3", "25.4", "25.5", "25.6", "25.7"]
-        },
-        {
-          "label": "Net Profit",
-          "values": ["12,000", "11,500", "11,000", "10,500", "10,200", "9,800"]
-        },
-        {
-          "label": "EPS in Rs",
-          "values": ["22.5", "21.8", "20.5", "19.2", "18.8", "17.5"]
-        },
-        {
-          "label": "Dividend",
-          "values": ["5.0", "4.5", "4.0", "3.5", "3.2", "3.0"]
-        },
-        {
-          "label": "Payout %",
-          "values": ["22.2", "20.6", "19.5", "18.2", "17.0", "17.1"]
-        }
-      ]
+      "Sep 2024": {
+        "sales": "45,000",
+        "expenses": "33,000",
+        "operating_profit": "12,000",
+        "opm_percent": "26.7",
+        "other_income": "500",
+        "interest": "800",
+        "depreciation": "200",
+        "profit_before_tax": "11,500",
+        "tax_percent": "25.2",
+        "net_profit": "12,000",
+        "eps_in_rs": "22.5",
+        "dividend": "5.0",
+        "payout_percent": "22.2"
+      },
+      "Jun 2024": {
+        "sales": "42,000",
+        "expenses": "31,500",
+        "operating_profit": "10,500",
+        "opm_percent": "25.0",
+        "other_income": "450",
+        "interest": "750",
+        "depreciation": "180",
+        "profit_before_tax": "10,020",
+        "tax_percent": "25.3",
+        "net_profit": "11,500",
+        "eps_in_rs": "21.8",
+        "dividend": "4.5",
+        "payout_percent": "20.6"
+      },
+      "Mar 2024": {
+        "sales": "40,000",
+        "expenses": "30,000",
+        "operating_profit": "10,000",
+        "opm_percent": "25.0",
+        "other_income": "400",
+        "interest": "700",
+        "depreciation": "170",
+        "profit_before_tax": "9,530",
+        "tax_percent": "25.4",
+        "net_profit": "11,000",
+        "eps_in_rs": "20.5",
+        "dividend": "4.0",
+        "payout_percent": "19.5"
+      },
+      "Dec 2023": {
+        "sales": "38,000",
+        "expenses": "28,500",
+        "operating_profit": "9,500",
+        "opm_percent": "25.0",
+        "other_income": "380",
+        "interest": "680",
+        "depreciation": "160",
+        "profit_before_tax": "9,040",
+        "tax_percent": "25.5",
+        "net_profit": "10,500",
+        "eps_in_rs": "19.2",
+        "dividend": "3.5",
+        "payout_percent": "18.2"
+      },
+      "Sep 2023": {
+        "sales": "38,000",
+        "expenses": "28,800",
+        "operating_profit": "9,200",
+        "opm_percent": "24.2",
+        "other_income": "350",
+        "interest": "650",
+        "depreciation": "150",
+        "profit_before_tax": "8,750",
+        "tax_percent": "25.6",
+        "net_profit": "10,200",
+        "eps_in_rs": "18.8",
+        "dividend": "3.2",
+        "payout_percent": "17.0"
+      },
+      "Jun 2023": {
+        "sales": "35,000",
+        "expenses": "26,500",
+        "operating_profit": "8,500",
+        "opm_percent": "24.3",
+        "other_income": "320",
+        "interest": "600",
+        "depreciation": "140",
+        "profit_before_tax": "8,080",
+        "tax_percent": "25.7",
+        "net_profit": "9,800",
+        "eps_in_rs": "17.5",
+        "dividend": "3.0",
+        "payout_percent": "17.1"
+      }
     },
 
     "profit_loss_raw": {
-      "headers": ["", "Mar 2024", "Mar 2023", "Mar 2022", "Mar 2021"],
-      "rows": [
-        {
-          "label": "Sales",
-          "values": ["1,80,000", "1,60,000", "1,40,000", "1,20,000"]
-        },
-        {
-          "label": "Expenses",
-          "values": ["1,30,000", "1,15,000", "1,00,000", "85,000"]
-        },
-        {
-          "label": "Operating Profit",
-          "values": ["50,000", "45,000", "40,000", "35,000"]
-        },
-        {
-          "label": "OPM %",
-          "values": ["27.8", "28.1", "28.6", "29.2"]
-        }
-      ]
+      "Mar 2024": {
+        "sales": "1,80,000",
+        "expenses": "1,30,000",
+        "operating_profit": "50,000",
+        "opm_percent": "27.8"
+      },
+      "Mar 2023": {
+        "sales": "1,60,000",
+        "expenses": "1,15,000",
+        "operating_profit": "45,000",
+        "opm_percent": "28.1"
+      },
+      "Mar 2022": {
+        "sales": "1,40,000",
+        "expenses": "1,00,000",
+        "operating_profit": "40,000",
+        "opm_percent": "28.6"
+      },
+      "Mar 2021": {
+        "sales": "1,20,000",
+        "expenses": "85,000",
+        "operating_profit": "35,000",
+        "opm_percent": "29.2"
+      }
     },
 
     "balance_sheet_raw": {
-      "headers": ["", "Mar 2024", "Mar 2023", "Mar 2022"],
-      "rows": [
-        {
-          "label": "Equity Capital",
-          "values": ["534", "534", "534"]
-        },
-        {
-          "label": "Reserves",
-          "values": ["2,40,000", "2,20,000", "2,00,000"]
-        },
-        {
-          "label": "Borrowings",
-          "values": ["80,000", "75,000", "70,000"]
-        },
-        {
-          "label": "Other Liabilities",
-          "values": ["60,000", "55,000", "50,000"]
-        },
-        {
-          "label": "Total Liabilities",
-          "values": ["3,80,534", "3,50,534", "3,20,534"]
-        },
-        {
-          "label": "Fixed Assets",
-          "values": ["45,000", "42,000", "40,000"]
-        },
-        {
-          "label": "Investments",
-          "values": ["1,20,000", "1,10,000", "1,00,000"]
-        },
-        {
-          "label": "Other Assets",
-          "values": ["2,15,534", "1,98,534", "1,80,534"]
-        },
-        {
-          "label": "Total Assets",
-          "values": ["3,80,534", "3,50,534", "3,20,534"]
-        }
-      ]
+      "Mar 2024": {
+        "equity_capital": "534",
+        "reserves": "2,40,000",
+        "borrowings": "80,000",
+        "other_liabilities": "60,000",
+        "total_liabilities": "3,80,534",
+        "fixed_assets": "45,000",
+        "investments": "1,20,000",
+        "other_assets": "2,15,534",
+        "total_assets": "3,80,534"
+      },
+      "Mar 2023": {
+        "equity_capital": "534",
+        "reserves": "2,20,000",
+        "borrowings": "75,000",
+        "other_liabilities": "55,000",
+        "total_liabilities": "3,50,534",
+        "fixed_assets": "42,000",
+        "investments": "1,10,000",
+        "other_assets": "1,98,534",
+        "total_assets": "3,50,534"
+      },
+      "Mar 2022": {
+        "equity_capital": "534",
+        "reserves": "2,00,000",
+        "borrowings": "70,000",
+        "other_liabilities": "50,000",
+        "total_liabilities": "3,20,534",
+        "fixed_assets": "40,000",
+        "investments": "1,00,000",
+        "other_assets": "1,80,534",
+        "total_assets": "3,20,534"
+      }
     },
 
     "cash_flow_raw": {
-      "headers": ["", "Mar 2024", "Mar 2023", "Mar 2022"],
-      "rows": [
-        {
-          "label": "Cash from Operating Activity",
-          "values": ["55,000", "50,000", "45,000"]
-        },
-        {
-          "label": "Cash from Investing Activity",
-          "values": ["-20,000", "-18,000", "-15,000"]
-        },
-        {
-          "label": "Cash from Financing Activity",
-          "values": ["-15,000", "-12,000", "-10,000"]
-        },
-        {
-          "label": "Net Cash Flow",
-          "values": ["20,000", "20,000", "20,000"]
-        }
-      ]
+      "Mar 2024": {
+        "cash_from_operating_activity": "55,000",
+        "cash_from_investing_activity": "-20,000",
+        "cash_from_financing_activity": "-15,000",
+        "net_cash_flow": "20,000"
+      },
+      "Mar 2023": {
+        "cash_from_operating_activity": "50,000",
+        "cash_from_investing_activity": "-18,000",
+        "cash_from_financing_activity": "-12,000",
+        "net_cash_flow": "20,000"
+      },
+      "Mar 2022": {
+        "cash_from_operating_activity": "45,000",
+        "cash_from_investing_activity": "-15,000",
+        "cash_from_financing_activity": "-10,000",
+        "net_cash_flow": "20,000"
+      }
     }
   }
 ]

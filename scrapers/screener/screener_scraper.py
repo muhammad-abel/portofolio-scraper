@@ -99,52 +99,74 @@ class ScreenerScraper:
         except (ValueError, AttributeError):
             return None
 
-    def _extract_table_raw(self, table_element, include_header_row: bool = True) -> Dict:
+    def _extract_table_raw(self, table_element) -> Dict:
         """
-        Extract complete table data as-is (raw approach)
+        Extract table data in dict-by-date format for RAG-friendly structure
 
-        This method extracts the entire table without processing,
-        preserving all data for LLM analysis.
+        This method transforms financial tables into a date-keyed dictionary
+        where each date maps to all metrics for that period.
 
         Args:
             table_element: BeautifulSoup table element
-            include_header_row: Include header row in data
 
         Returns:
-            Dictionary with headers and rows (all as strings)
+            Dict where keys are dates/quarters and values are metric dicts
+            Example: {
+                "Sep 2024": {"revenue": "83,002", "profit": "18,627"},
+                "Jun 2024": {"revenue": "81,546", "profit": "17,188"}
+            }
         """
-        table_data = {
-            "headers": [],
-            "rows": []
-        }
+        result = {}
 
         try:
-            # Extract headers
+            # Extract headers (dates/quarters)
+            headers = []
             thead = table_element.find('thead')
             if thead:
                 header_row = thead.find('tr')
                 if header_row:
-                    headers = header_row.find_all(['th', 'td'])
-                    table_data["headers"] = [h.get_text(strip=True) for h in headers]
+                    headers = [h.get_text(strip=True) for h in header_row.find_all(['th', 'td'])]
 
-            # Extract all rows
+            # Skip first header (metric name column)
+            date_headers = headers[1:] if len(headers) > 1 else []
+
+            # Initialize dict for each date
+            for date in date_headers:
+                if date:  # Skip empty headers
+                    result[date] = {}
+
+            # Extract rows (metrics)
             tbody = table_element.find('tbody')
             if tbody:
                 rows = tbody.find_all('tr')
                 for row in rows:
                     cells = row.find_all(['td', 'th'])
-                    if cells:
-                        # Store as dict with first cell as key (metric name)
-                        row_data = {
-                            "label": cells[0].get_text(strip=True) if cells else "",
-                            "values": [cell.get_text(strip=True) for cell in cells[1:]]
-                        }
-                        table_data["rows"].append(row_data)
+                    if cells and len(cells) > 0:
+                        metric_label = cells[0].get_text(strip=True)
+
+                        # Skip empty labels
+                        if not metric_label:
+                            continue
+
+                        # Convert label to snake_case key
+                        metric_key = metric_label.lower()
+                        metric_key = metric_key.replace('+', '')
+                        metric_key = metric_key.replace('%', '_percent')
+                        metric_key = metric_key.replace('/', '_')
+                        metric_key = re.sub(r'\s+', '_', metric_key)  # Replace spaces with underscore
+                        metric_key = re.sub(r'_+', '_', metric_key)   # Remove duplicate underscores
+                        metric_key = metric_key.strip('_')             # Remove leading/trailing underscores
+
+                        # Assign values to each date
+                        for i, cell in enumerate(cells[1:]):
+                            if i < len(date_headers) and date_headers[i]:
+                                value = cell.get_text(strip=True)
+                                result[date_headers[i]][metric_key] = value
 
         except Exception as e:
             logger.debug(f"Error extracting raw table: {e}")
 
-        return table_data
+        return result
 
     def _extract_fundamentals_raw(self, soup: BeautifulSoup) -> List[Dict]:
         """
