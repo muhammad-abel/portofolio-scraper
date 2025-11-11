@@ -35,6 +35,7 @@ ENV/
 
 # Logs
 *.log
+logs/
 scraper.log
 scraper_selenium.log
 
