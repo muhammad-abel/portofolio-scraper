@@ -1,6 +1,6 @@
 # Portfolio Web Scrapers
 
-Collection of web scrapers untuk berbagai website - Moneycontrol News & TradingEconomics Indicators
+Collection of web scrapers untuk berbagai website - Moneycontrol News, TradingEconomics Indicators & Screener.in Stock Fundamentals
 
 ## 📁 Struktur Project
 
@@ -8,26 +8,39 @@ Collection of web scrapers untuk berbagai website - Moneycontrol News & TradingE
 portofolio-scraper/
 ├── scrapers/                       # Core scraper modules
 │   ├── __init__.py
+│   ├── base_scraper.py             # Base scraper with memory-efficient patterns
 │   ├── crawl4ai_scraper.py         # Moneycontrol scraper (RECOMMENDED)
 │   ├── playwright_scraper.py       # Moneycontrol Playwright scraper
 │   ├── requests_scraper.py         # Moneycontrol Requests scraper
 │   ├── auto_pages_scraper.py       # Moneycontrol auto-detect pages
-│   └── tradingeconomics/           # TradingEconomics scrapers
+│   ├── tradingeconomics/           # TradingEconomics scrapers
+│   │   ├── __init__.py
+│   │   └── indicators_scraper.py   # Economic indicators scraper
+│   └── screener/                   # Screener.in scrapers (NEW)
 │       ├── __init__.py
-│       └── indicators_scraper.py   # Economic indicators scraper
+│       └── screener_scraper.py     # Stock fundamentals scraper
+├── data/                           # Data files
+│   └── nifty100_symbols.json       # Nifty 100 stock symbols
 ├── examples/                       # Example & template scripts
 │   ├── custom_scraper.py           # Template untuk custom website
-│   └── json_output_examples.py     # Contoh berbagai format JSON output
+│   ├── json_output_examples.py     # Contoh berbagai format JSON output
+│   ├── memory_efficient_scraping.py # Memory optimization examples
+│   └── screener_output_example.json # Example screener output
 ├── docs/                           # Documentation
 │   ├── SCRAPING_GUIDE.md           # Panduan lengkap web scraping
-│   └── ERROR_HANDLING_GUIDE.md     # Troubleshooting & error handling
+│   ├── ERROR_HANDLING_GUIDE.md     # Troubleshooting & error handling
+│   └── MEMORY_OPTIMIZATION.md      # Memory optimization guide
+├── tools/                          # Utility tools
+│   └── memory_profiler.py          # Memory profiling tool
 ├── logs/                           # Log files (auto-created)
 │   ├── moneycontrol/
-│   └── tradingeconomics/
+│   ├── tradingeconomics/
+│   └── screener/
 ├── run_crawl4ai.py                 # Moneycontrol scraper runner
 ├── run_playwright.py               # Moneycontrol Playwright runner
 ├── run_requests.py                 # Moneycontrol Requests runner
-├── run_tradingeconomics.py         # TradingEconomics scraper runner (NEW)
+├── run_tradingeconomics.py         # TradingEconomics scraper runner
+├── run_screener.py                 # Screener.in scraper runner (NEW)
 ├── upload_to_mongodb.py            # Upload JSON data ke MongoDB
 ├── config.py                       # Konfigurasi settings
 ├── requirements.txt                # Dependencies
@@ -635,6 +648,206 @@ Edit `.env` file:
 MONGODB_CONNECTION_STRING=mongodb://localhost:27017/
 MONGODB_DATABASE_NAME=tradingeconomics_db
 ```
+
+---
+
+# 📈 Screener.in Stock Fundamentals Scraper
+
+Scraper untuk mengekstrak fundamental data, shareholding patterns, dan quarterly results dari Screener.in untuk Nifty 100 stocks
+
+## 🚀 Quick Start - Screener.in
+
+```bash
+# Scrape all Nifty 100 stocks (default)
+python run_screener.py
+
+# Scrape specific stocks
+python run_screener.py --symbols HDFCBANK,TCS,RELIANCE
+
+# Use generator method (memory-efficient for all 100 stocks)
+python run_screener.py --method generator
+
+# Custom batch size and delay
+python run_screener.py --batch-size 20 --delay 2.5
+
+# Save to custom output file
+python run_screener.py --output nifty100_data.json
+```
+
+## 📊 What Data is Scraped
+
+### 1. **Stock Fundamentals** ⭐
+- Current Price, 52-week High/Low
+- Market Cap
+- Valuation Ratios: P/E, P/B, EV/EBITDA
+- Profitability: ROE, ROCE, Net Profit Margin
+- Debt/Equity Ratio
+- Sales & Profit Growth
+
+### 2. **Shareholding Patterns** ⭐⭐⭐ (MOST VALUABLE!)
+- Promoter Holding %
+- **FII (Foreign Institutional Investors) Holding %**
+- **DII (Domestic Institutional Investors) Holding %**
+- Public Holding %
+- **Quarter-over-Quarter Changes** (FII/DII movements!)
+- Historical quarterly data (last 4 quarters)
+
+**Why Important:** FII/DII data is UNIQUE to screener.in and directly answers:
+- "What are recent FII and DII investment trends?"
+- Helps explain market movements
+- Indicates institutional confidence
+
+### 3. **Quarterly Results**
+- Revenue (QoQ & YoY growth)
+- Net Profit (QoQ & YoY growth)
+- EPS
+- Sales Growth %
+- Last 4 quarters data
+
+## 💾 Data Structure - Screener.in
+
+```json
+{
+  "symbol": "HDFCBANK",
+  "name": "HDFC Bank Ltd",
+  "sector": "Banking",
+  "current_price": 1645.50,
+  "market_cap": 1250000,
+  "pe_ratio": 18.5,
+  "pb_ratio": 2.8,
+  "roe": 16.5,
+  "roce": 8.2,
+  "shareholding": {
+    "latest_quarter": "Sep 2024",
+    "promoter": 26.5,
+    "fii": 45.2,  // ⭐ Key data!
+    "dii": 18.3,  // ⭐ Key data!
+    "fii_change_qoq": 1.2,  // ⭐ Very important!
+    "dii_change_qoq": -0.5,
+    "historical": [...]
+  },
+  "quarterly_results": [
+    {
+      "quarter": "Sep 2024",
+      "revenue": 45000,
+      "profit": 12000,
+      "eps": 22.5,
+      "revenue_growth_yoy": 18.5,
+      "profit_growth_yoy": 22.3
+    },
+    ...
+  ],
+  "scraped_at": "2024-11-11T...",
+  "hash": "abc123..."
+}
+```
+
+## 🎯 Usage Options
+
+### Method 1: All Nifty 100 (Batched - Recommended)
+```bash
+python run_screener.py --batch-size 20
+# Scrapes in batches of 20 stocks
+# Memory-efficient, good progress tracking
+```
+
+### Method 2: All Nifty 100 (Generator - Most Memory Efficient)
+```bash
+python run_screener.py --method generator
+# Constant memory usage
+# Single JSON output file
+```
+
+### Method 3: Specific Stocks Only
+```bash
+python run_screener.py --symbols HDFCBANK,TCS,RELIANCE,INFY
+# Quick testing or specific stocks
+```
+
+### Method 4: Custom Symbol List
+```bash
+# Create your own JSON file with symbols
+python run_screener.py --symbols-file data/my_stocks.json
+```
+
+## ⚙️ Configuration
+
+**Available Options:**
+```bash
+--symbols-file PATH      JSON file with stock symbols (default: data/nifty100_symbols.json)
+--symbols LIST           Comma-separated symbols (e.g., HDFCBANK,TCS)
+--method METHOD          Scraping method: standard, generator, batched (default: batched)
+--batch-size N           Batch size for batched method (default: 10)
+--delay SECONDS          Delay between stocks (default: 3.0)
+--output PATH            Output JSON file (default: screener_stocks.json)
+```
+
+## ⚠️ Important Notes
+
+1. **Rate Limiting**: Screener.in has anti-bot measures
+   - Default delay: 3 seconds between stocks
+   - Don't set delay < 2 seconds
+   - Use low concurrency
+
+2. **Scraping Time**:
+   - 100 stocks × 3 seconds = ~5 minutes
+   - Plan accordingly for complete Nifty 100 scrape
+
+3. **Data Quality**:
+   - Some metrics may be null for certain stocks
+   - Scraper handles missing data gracefully
+   - Check logs for any failures
+
+4. **Symbol Format**:
+   - Use screener.in format (e.g., "HDFCBANK" not "HDFCBANK.NS")
+   - Nifty 100 list already formatted correctly
+
+## 🗄️ MongoDB Integration
+
+Upload screener data to MongoDB:
+
+```python
+from upload_to_mongodb import MongoDBUploader
+
+uploader = MongoDBUploader(
+    connection_string="mongodb://localhost:27017/",
+    database_name="stocks_db",
+    collection_name="nifty100_fundamentals"
+)
+
+uploader.connect()
+uploader.create_indexes()
+
+# Load scraped data
+with open('screener_stocks.json') as f:
+    stocks = json.load(f)
+
+# Upload
+stats = uploader.upload_articles(stocks, upsert=True)
+```
+
+**Deduplication:** Uses `hash` field (symbol + scrape date)
+
+## 📖 Example Output
+
+See `examples/screener_output_example.json` for complete data structure example.
+
+## 🔗 Integration with Other Scrapers
+
+**Perfect Combination:**
+1. **Moneycontrol** → News & market sentiment
+2. **TradingEconomics** → Macro indicators (GDP, inflation, rates)
+3. **Screener.in** → Stock fundamentals & FII/DII data
+
+**Example RAG Query:**
+> "Why is HDFC Bank down 5% today?"
+
+**Your Bot Can Answer:**
+- Check Moneycontrol: Any negative news?
+- Check TradingEconomics: RBI rate hike affecting banks?
+- Check Screener: FII selling? Fundamentals weakening?
+
+**Multi-source insights = Better answers!** 🎯
 
 ---
 

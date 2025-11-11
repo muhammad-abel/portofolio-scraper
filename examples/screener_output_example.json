@@ -1,0 +1,129 @@
+[
+  {
+    "symbol": "HDFCBANK",
+    "scraped_at": "2024-11-11T10:30:00.123456",
+    "url": "https://www.screener.in/company/HDFCBANK/consolidated/",
+    "hash": "abc123def456...",
+    "name": "HDFC Bank Ltd",
+    "sector": "Banking",
+    "current_price": 1645.50,
+    "market_cap": 1250000,
+    "pe_ratio": 18.5,
+    "pb_ratio": 2.8,
+    "dividend_yield": 1.2,
+    "roe": 16.5,
+    "roce": 8.2,
+    "debt_to_equity": 0.5,
+    "current_ratio": 1.1,
+    "sales_growth": 18.5,
+    "profit_growth": 22.3,
+    "shareholding": {
+      "latest_quarter": "Sep 2024",
+      "promoter": 26.5,
+      "fii": 45.2,
+      "dii": 18.3,
+      "public": 10.0,
+      "fii_change_qoq": 1.2,
+      "dii_change_qoq": -0.5,
+      "promoter_change_qoq": 0.0,
+      "historical": [
+        {
+          "quarter": "Sep 2024",
+          "promoter": 26.5,
+          "fii": 45.2,
+          "dii": 18.3,
+          "public": 10.0
+        },
+        {
+          "quarter": "Jun 2024",
+          "promoter": 26.5,
+          "fii": 44.0,
+          "dii": 18.8,
+          "public": 10.7
+        },
+        {
+          "quarter": "Mar 2024",
+          "promoter": 26.5,
+          "fii": 43.5,
+          "dii": 19.2,
+          "public": 10.8
+        },
+        {
+          "quarter": "Dec 2023",
+          "promoter": 26.5,
+          "fii": 42.8,
+          "dii": 19.5,
+          "public": 11.2
+        }
+      ]
+    },
+    "quarterly_results": [
+      {
+        "quarter": "Sep 2024",
+        "revenue": 45000,
+        "profit": 12000,
+        "eps": 22.5,
+        "revenue_growth_yoy": 18.5,
+        "profit_growth_yoy": 22.3
+      },
+      {
+        "quarter": "Jun 2024",
+        "revenue": 42000,
+        "profit": 11500,
+        "eps": 21.8,
+        "revenue_growth_yoy": 17.2,
+        "profit_growth_yoy": 20.1
+      },
+      {
+        "quarter": "Mar 2024",
+        "revenue": 40000,
+        "profit": 11000,
+        "eps": 20.5,
+        "revenue_growth_yoy": 15.8,
+        "profit_growth_yoy": 18.5
+      },
+      {
+        "quarter": "Dec 2023",
+        "revenue": 38000,
+        "profit": 10500,
+        "eps": 19.2,
+        "revenue_growth_yoy": 14.2,
+        "profit_growth_yoy": 16.8
+      }
+    ]
+  },
+  {
+    "symbol": "TCS",
+    "name": "Tata Consultancy Services Ltd",
+    "sector": "IT Services",
+    "current_price": 3850.25,
+    "market_cap": 1400000,
+    "pe_ratio": 28.5,
+    "pb_ratio": 12.2,
+    "roe": 42.5,
+    "roce": 48.2,
+    "shareholding": {
+      "latest_quarter": "Sep 2024",
+      "promoter": 72.3,
+      "fii": 14.2,
+      "dii": 8.5,
+      "public": 5.0,
+      "fii_change_qoq": -0.3,
+      "dii_change_qoq": 0.2,
+      "promoter_change_qoq": 0.0
+    },
+    "quarterly_results": [
+      {
+        "quarter": "Sep 2024",
+        "revenue": 62000,
+        "profit": 11500,
+        "eps": 31.2,
+        "revenue_growth_yoy": 8.5,
+        "profit_growth_yoy": 9.2
+      }
+    ],
+    "scraped_at": "2024-11-11T10:35:00.123456",
+    "url": "https://www.screener.in/company/TCS/consolidated/",
+    "hash": "xyz789abc123..."
+  }
+]
