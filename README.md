@@ -839,7 +839,19 @@ python scrapers/screener/screener_scraper.py \
   --mongodb-collection nifty100 \
   --mongodb-batch-size 50
 
-# Or use environment variables
+# Or use .env file (recommended)
+# Copy .env.example to .env and configure:
+cp .env.example .env
+# Edit .env file:
+# MONGODB_URI=mongodb://localhost:27017/
+# MONGODB_DB=screener_db
+# MONGODB_COLLECTION=stocks
+
+python scrapers/screener/screener_scraper.py \
+  --symbols-file data/nifty100_symbols.json \
+  --upload-mongodb
+
+# Or use environment variables directly
 export MONGODB_URI="mongodb://localhost:27017/"
 export MONGODB_DB="screener_db"
 export MONGODB_COLLECTION="stocks"

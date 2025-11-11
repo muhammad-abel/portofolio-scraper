@@ -28,6 +28,10 @@ from datetime import datetime
 from typing import List, Dict, Optional, AsyncIterator
 import argparse
 import re
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Optional MongoDB support
 try:
