@@ -1,525 +1,359 @@
 # Moneycontrol News Scraper
 
-Web scraper untuk mengekstrak berita dari Moneycontrol.com bagian Markets (https://www.moneycontrol.com/news/business/markets/)
+Scrapes news articles from Moneycontrol.com (https://www.moneycontrol.com/news/business/)
+and exports them to JSON, CSV, or MongoDB.
 
-## 📁 Struktur Project
+Four scraper implementations are included. **Use the Crawl4AI one** - it is the only one
+that is fully featured (CLI flags, category selection, full article text, MongoDB upload).
+The other three are simpler variants kept for reference and comparison.
+
+---
+
+## Project Layout
 
 ```
 portofolio-scraper/
-├── scrapers/                    # Core scraper modules
-│   ├── __init__.py
-│   ├── crawl4ai_scraper.py      # Scraper dengan Crawl4AI (RECOMMENDED)
-│   ├── playwright_scraper.py    # Scraper dengan Playwright
-│   ├── requests_scraper.py      # Scraper dengan Requests (basic)
-│   └── auto_pages_scraper.py    # Enhanced scraper dengan auto-detect pages
-├── examples/                    # Example & template scripts
-│   ├── custom_scraper.py        # Template untuk custom website
-│   └── json_output_examples.py  # Contoh berbagai format JSON output
-├── docs/                        # Documentation
-│   ├── SCRAPING_GUIDE.md        # Panduan lengkap web scraping
-│   └── ERROR_HANDLING_GUIDE.md  # Troubleshooting & error handling
-├── run_crawl4ai.py             # Quick run script (Crawl4AI)
-├── run_playwright.py           # Quick run script (Playwright)
-├── run_requests.py             # Quick run script (Requests)
-├── upload_to_mongodb.py        # Upload JSON data ke MongoDB
-├── config.py                   # Konfigurasi settings
-├── requirements.txt            # Dependencies
-├── .env.example                # Contoh konfigurasi environment variables
-├── README.md                   # Dokumentasi utama
-└── .gitignore                  # Git ignore rules
+|-- scrapers/
+|   |-- __init__.py
+|   |-- crawl4ai_scraper.py      # Main scraper. Async, has CLI, has MongoDB upload.
+|   |-- playwright_scraper.py    # Playwright variant. No CLI, no full_content.
+|   |-- requests_scraper.py      # requests + BeautifulSoup. No JS support.
+|   |-- auto_pages_scraper.py    # Crawl4AI + auto-detect of total page count.
+|-- examples/
+|   |-- custom_scraper.py        # Template for adapting this to another site
+|   |-- json_output_examples.py  # Demonstrates 8 JSON output shapes
+|-- docs/
+|   |-- SCRAPING_GUIDE.md        # How the scraping works, selector reference
+|   |-- ERROR_HANDLING_GUIDE.md  # Timeouts, rate limiting, retries
+|-- run_crawl4ai.py              # Entry point -> crawl4ai_scraper.main()
+|-- run_playwright.py            # Entry point -> playwright_scraper.main()
+|-- run_requests.py              # Entry point -> requests_scraper.main()
+|-- upload_to_mongodb.py         # Standalone: upload an existing JSON file to MongoDB
+|-- config.py                    # NOT USED - see "About config.py" below
+|-- requirements.txt
+|-- .env.example                 # Copy to .env and fill in MongoDB settings
 ```
 
-## ✨ Fitur
+---
 
-- ✅ **3 Mode Scraper**: Crawl4AI (powerful), Playwright (reliable), Requests (simple)
-- ✅ **Auto Page Detection**: Otomatis detect total pages yang tersedia
-- ✅ **Detail Extraction**: Fetch date & author dari detail page
-- ✅ **Concurrency Control**: Limit concurrent requests untuk stabilitas
-- ✅ **Error Handling**: Retry mechanism dengan exponential backoff
-- ✅ **Multiple Export**: JSON, CSV, dan Excel
-- ✅ **MongoDB Integration**: Upload otomatis ke MongoDB dengan deduplication
-- ✅ **Comprehensive Logging**: Track semua aktivitas scraping
+## Setup
 
-## 🚀 Quick Start
-
-### 1. Clone & Setup
+Requires Python 3.8+.
 
 ```bash
-git clone <repository-url>
-cd portofolio-scraper
-```
+# 1. Virtual environment (recommended)
+python -m venv venv
+venv\Scripts\activate        # Windows
+source venv/bin/activate     # Linux / macOS
 
-### 2. Install Dependencies
-
-```bash
-# Buat virtual environment (recommended)
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# atau
-venv\Scripts\activate  # Windows
-
-# Install dependencies
+# 2. Dependencies
 pip install -r requirements.txt
 
-# Install Playwright browsers (untuk Crawl4AI & Playwright)
+# 3. Browser binary (needed by Crawl4AI and Playwright scrapers)
 playwright install chromium
 ```
 
-### 3. Run Scraper
+MongoDB is optional. You only need it if you plan to use `--upload-mongo` or
+`upload_to_mongodb.py`. See [MongoDB](#mongodb) below.
 
-**Option 1: Crawl4AI (RECOMMENDED 🚀)**
+---
+
+## Usage
+
+### Crawl4AI scraper (the main one)
+
 ```bash
-# Basic usage - markets category (default, scrapes 3 pages)
+# Default: markets category, 3 pages, saves JSON + CSV to the project root
 python run_crawl4ai.py
 
-# Scrape world news
+# Pick a category and page count
 python run_crawl4ai.py --category world --pages 10
 
-# Scrape stocks news and upload to MongoDB
+# Scrape and push straight to MongoDB (no local files are written)
 python run_crawl4ai.py --category stocks --pages 5 --upload-mongo
 
-# Scrape economy news with custom settings
-python run_crawl4ai.py --category economy --pages 10 --max-concurrent 3 --upload-mongo
+# Gentler on the site: fewer parallel requests, longer pause between pages
+python run_crawl4ai.py --category economy --pages 10 --max-concurrent 3 --delay 3.0
 
-# View all options
 python run_crawl4ai.py --help
 ```
 
-**Available Categories:**
-- `markets` - Business/Markets news (default)
-- `world` - World news
-- `stocks` - Stock market news
-- `economy` - Economy news
+**Flags**
 
-**Available Options:**
-- `--category NAME`: Category to scrape (default: markets)
-- `--pages N`: Number of pages to scrape (default: 3)
-- `--max-concurrent N`: Max concurrent detail page requests (default: 5)
-- `--delay SECONDS`: Delay between page requests (default: 2.0)
-- `--upload-mongo`: Upload directly to MongoDB (skip local file saving)
-- `--no-details`: Skip fetching article details (faster, but no date/author/full_content)
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--category` | `markets` | One of `markets`, `world`, `stocks`, `economy` |
+| `--pages` | `3` | How many list pages to walk |
+| `--max-concurrent` | `5` | Cap on simultaneous article-detail fetches |
+| `--delay` | `2.0` | Seconds to wait between list pages |
+| `--upload-mongo` | off | Upload to MongoDB instead of writing local files |
+| `--no-details` | off | Skip detail pages. Much faster, but you lose `date`, `author`, and `full_content` |
 
-**Output Files by Category:**
-```
-moneycontrol_markets_crawl4ai.json    # Markets
-moneycontrol_world_crawl4ai.json      # World
-moneycontrol_stocks_crawl4ai.json     # Stocks
-moneycontrol_economy_crawl4ai.json    # Economy
-```
+**Categories** map to these URLs:
 
-**Log Files (in logs/ directory):**
+| Category | URL |
+|----------|-----|
+| `markets` | `https://www.moneycontrol.com/news/business/markets/` |
+| `world` | `https://www.moneycontrol.com/news/business/world/` |
+| `stocks` | `https://www.moneycontrol.com/news/business/stocks/` |
+| `economy` | `https://www.moneycontrol.com/news/business/economy/` |
+
+**Output files** are named after the category:
+
 ```
+moneycontrol_markets_crawl4ai.json
+moneycontrol_markets_crawl4ai.csv
 logs/scraper_markets_crawl4ai.log
-logs/scraper_world_crawl4ai.log
-logs/scraper_stocks_crawl4ai.log
-logs/scraper_economy_crawl4ai.log
 ```
 
-**Note:** Ketika menggunakan `--upload-mongo`, file JSON dan CSV **tidak akan disimpan** secara lokal. Data langsung di-upload ke MongoDB saja.
+Note that `--upload-mongo` **replaces** local file output rather than adding to it. With
+that flag set, no JSON or CSV is written - the articles go straight from memory into
+MongoDB. Drop the flag if you want files on disk.
 
-**Option 2: Playwright**
+### The other three scrapers
+
+These have **no command-line arguments**. Settings are hardcoded in their `main()`
+functions - edit the file if you want to change them.
+
 ```bash
-python run_playwright.py
+python run_playwright.py                  # markets, 3 pages, headless Chromium
+python run_requests.py                    # markets, 3 pages, no browser
+python scrapers/auto_pages_scraper.py     # markets, auto-detects page count, capped at 5
 ```
 
-**Option 3: Requests (Simple)**
-```bash
-python run_requests.py
-```
+| Scraper | Browser | JS | `full_content` | `hash` | CLI | Output file | Log file |
+|---------|---------|-----|----------------|--------|-----|-------------|----------|
+| `crawl4ai_scraper` | yes | yes | yes | yes | yes | `moneycontrol_<category>_crawl4ai.*` | `logs/scraper_<category>_crawl4ai.log` |
+| `playwright_scraper` | yes | yes | no | no | no | `moneycontrol_news_playwright.*` | `scraper_playwright.log` |
+| `requests_scraper` | no | no | no | no | no | `moneycontrol_news.*` | `scraper.log` |
+| `auto_pages_scraper` | yes | yes | no | no | no | `moneycontrol_auto.*` | `scraper_crawl4ai_enhanced.log` |
 
-## 📊 Output
+`auto_pages_scraper` is the interesting one of the three: it binary-searches for the last
+existing page number, so you can scrape a whole category without knowing its size. Its
+`main()` currently caps at 5 pages - the uncapped call is on the line above, commented out.
 
-Scraper akan menghasilkan:
-```
-moneycontrol_news_crawl4ai.json    # Data dalam format JSON
-moneycontrol_news_crawl4ai.csv     # Data dalam format CSV
-scraper_crawl4ai.log               # Log file untuk debugging
-```
+---
 
-### Contoh Output JSON
+## Output Format
 
 ```json
 [
   {
-    "title": "Powell says tariffs adding some pressure to inflation...",
+    "title": "Powell says tariffs adding some pressure to inflation",
     "url": "https://www.moneycontrol.com/news/business/markets/...",
     "hash": "kH8x5yF2mQ9nL3pR7vT1wK4sJ6bN0cV8zX2dG5hM1aY=",
     "summary": "Federal Reserve Chair Jerome Powell said tariffs...",
     "image_url": "https://images.moneycontrol.com/...",
     "date": "November 07, 2025",
     "author": "Moneycontrol News",
-    "full_content": "Federal Reserve Chair Jerome Powell said...\n\nThe central bank has been monitoring...\n\nPowell emphasized that...",
+    "full_content": "Federal Reserve Chair Jerome Powell said...\n\nThe central bank...",
     "scraped_at": "2025-11-07T08:30:00.123456"
   }
 ]
 ```
 
-**Field Descriptions:**
-- `title`: Judul artikel
-- `url`: URL lengkap artikel
-- `hash`: **Unique identifier** (SHA256 hash dari title+date, encoded base64) - untuk mencegah duplikasi
-- `summary`: Ringkasan/excerpt dari list page
-- `image_url`: URL gambar thumbnail
-- `date`: Tanggal publikasi (dari detail page)
-- `author`: Nama penulis (dari detail page)
-- `full_content`: Konten artikel lengkap (semua paragraf dari detail page)
-- `scraped_at`: Timestamp scraping
+| Field | Source | Notes |
+|-------|--------|-------|
+| `title` | list page | |
+| `url` | list page | Absolute URL |
+| `summary` | list page | Short excerpt |
+| `image_url` | list page | Falls back to `data-src` for lazy-loaded images |
+| `date` | detail page | Empty if `--no-details` or if extraction fails |
+| `author` | detail page | Often empty - many articles have no byline |
+| `full_content` | detail page | All `<p>` text joined by blank lines. Crawl4AI scraper only |
+| `hash` | generated | Deduplication key. Crawl4AI scraper only |
+| `scraped_at` | generated | ISO 8601 timestamp of the scrape |
 
-## 💾 Upload ke MongoDB
+`sample_output.example.json` holds a small fabricated sample if you want to see the shape
+without running anything.
 
-Upload hasil scraping ke MongoDB dengan 2 cara:
+### The `hash` field
 
-### **Cara 1: Auto-Upload Saat Scraping (RECOMMENDED)**
+`hash` is `base64(sha256(lower(title) + "|" + lower(date)))`. It is the deduplication key
+for MongoDB, chosen over `url` because Moneycontrol URLs can change while the article stays
+the same. Two consequences worth knowing:
 
-Gunakan flag `--upload-mongo` untuk langsung upload setelah scraping:
+- If `date` extraction fails, the hash is computed over an empty date. The same article
+  scraped later *with* a date produces a **different hash**, so it lands as a second
+  document rather than an update.
+- Only the Crawl4AI scraper generates it (see [MongoDB](#mongodb)).
+
+---
+
+## MongoDB
+
+### Configuration
+
+Copy the example file and fill it in. `.env` is gitignored - it never gets committed.
 
 ```bash
-# Setup: Edit .env atau upload_to_mongodb.py dengan MongoDB credentials
 cp .env.example .env
-nano .env  # Isi MONGODB_CONNECTION_STRING, DATABASE_NAME, dll
-
-# Scrape dan upload langsung
-python run_crawl4ai.py --pages 5 --upload-mongo
 ```
 
-### **Cara 2: Upload Manual dari File JSON**
+```bash
+# .env
+MONGODB_CONNECTION_STRING=mongodb://localhost:27017/
+MONGODB_DATABASE_NAME=moneycontrol_db
+MONGODB_COLLECTION_NAME=news_articles
+JSON_FILE_PATH=moneycontrol_markets_crawl4ai.json
+```
 
-Upload file JSON yang sudah ada:
+Connection string formats:
+
+| Target | Example |
+|--------|---------|
+| Local | `mongodb://localhost:27017/` |
+| Local with auth | `mongodb://user:pass@localhost:27017/` |
+| Atlas | `mongodb+srv://user:pass@cluster.mongodb.net/` |
+
+All four settings have defaults in `upload_to_mongodb.py`, so `.env` is optional if
+localhost defaults suit you.
+
+### Two ways to upload
+
+**During the scrape** - articles go straight from memory to MongoDB, no files:
+
+```bash
+python run_crawl4ai.py --category markets --pages 5 --upload-mongo
+```
+
+**After the fact** - loads the JSON file named by `JSON_FILE_PATH`:
 
 ```bash
 python upload_to_mongodb.py
 ```
 
-### Setup MongoDB
+> **Heads up on `JSON_FILE_PATH`:** its built-in default is
+> `moneycontrol_news_crawl4ai.json`, which is an *older* naming scheme. The scraper now
+> writes per-category names like `moneycontrol_markets_crawl4ai.json`. Set `JSON_FILE_PATH`
+> in your `.env` to the file you actually produced, or the upload will not find it.
 
-```bash
-# Install pymongo (sudah ada di requirements.txt)
-pip install pymongo
+### How the upload behaves
 
-# Copy .env.example ke .env
-cp .env.example .env
+- Creates a **unique index on `hash`**, plus plain indexes on `url`, `date`, and
+  `scraped_at`.
+- Uses `bulk_write` with `UpdateOne(..., upsert=True)` keyed on `hash`, falling back to
+  `url` when a document has no `hash`. Re-scraping the same articles updates them in place
+  instead of duplicating.
+- Reports inserted / updated / skipped / failed counts, then prints collection stats.
 
-# Edit .env dan isi dengan MongoDB credentials Anda
-nano .env  # atau text editor lainnya
-```
+> **Only feed it Crawl4AI output.** The other three scrapers do not produce a `hash` field.
+> Because the collection has a unique index on `hash`, a batch of hash-less documents all
+> read as `hash: null` and collide with each other - the first one inserts and the rest
+> fail with a duplicate key error. If you want to upload output from those scrapers, either
+> add a hash field first or drop the unique index.
 
-### Konfigurasi
+---
 
-Edit `.env` file:
+## Tuning
 
-```bash
-MONGODB_CONNECTION_STRING=mongodb://localhost:27017/
-MONGODB_DATABASE_NAME=moneycontrol_db
-MONGODB_COLLECTION_NAME=news_articles
-```
-
-Atau edit langsung di `upload_to_mongodb.py`:
-
-```python
-MONGODB_CONNECTION_STRING = "mongodb://localhost:27017/"
-DATABASE_NAME = "moneycontrol_db"
-COLLECTION_NAME = "news_articles"
-```
-
-**Fitur Upload:**
-- Auto-deduplication berdasarkan **hash** (SHA256 dari title+date)
-- Upsert mode (update existing + insert new)
-- Bulk operations untuk performa tinggi
-- Progress tracking & logging
-- Error handling yang robust
-- Auto-indexing untuk query performance
-
-**Catatan Deduplication:**
-- Scraper menggunakan hash SHA256 (base64) dari kombinasi `title + date` sebagai unique identifier
-- Hash lebih reliable daripada URL karena URL bisa berubah tapi konten tetap sama
-- MongoDB akan otomatis skip artikel duplikat berdasarkan hash
-- Jika ada artikel dengan judul dan tanggal yang sama, hanya versi terbaru yang tersimpan
-
-## 🎛️ Konfigurasi
-
-Edit `config.py` untuk customize:
+There are no config files to edit - pass flags, or construct the scraper yourself:
 
 ```python
-NUM_PAGES = 3              # Jumlah halaman yang akan di-scrape
-DELAY_BETWEEN_PAGES = 2.0  # Delay antar page (detik)
-OUTPUT_JSON = True         # Export ke JSON
-OUTPUT_CSV = True          # Export ke CSV
-```
-
-Atau configure di code:
-
-```python
+import asyncio
 from scrapers import MoneyControlCrawl4AIScraper
 
-# Custom configuration
-scraper = MoneyControlCrawl4AIScraper(
-    fetch_details=True,      # Fetch date & author dari detail page
-    max_concurrent=5         # Max 5 concurrent requests (adjust sesuai network)
-)
+async def run():
+    scraper = MoneyControlCrawl4AIScraper(
+        base_url="https://www.moneycontrol.com/news/business/markets/",
+        fetch_details=True,   # False = skip detail pages (same as --no-details)
+        max_concurrent=5,     # Parallel detail fetches
+    )
+    articles = await scraper.scrape_multiple_pages(num_pages=5, delay=2.0)
+    scraper.save_to_json(articles, "my_output.json")
+    scraper.save_to_csv(articles, "my_output.csv")
 
-# Scrape dengan custom settings
-articles = await scraper.scrape_multiple_pages(
-    num_pages=5,            # Scrape 5 pages
-    delay=2.0               # 2 detik delay antar page
-)
+asyncio.run(run())
 ```
 
-## 📚 Mode Scraper
+`save_to_excel()` also exists but needs `openpyxl`, which is not in `requirements.txt` -
+`pip install openpyxl` first.
 
-### 🚀 **Crawl4AI Scraper** (RECOMMENDED)
+Rules of thumb:
 
-**Keunggulan:**
-- Built khusus untuk AI/LLM extraction
-- Otomatis handle JavaScript
-- Async untuk performa tinggi
-- Smart content extraction
-- **Concurrency control** untuk stabilitas
+- **Getting timeouts?** Lower `--max-concurrent` to 3 and raise `--delay` to 3.0.
+- **Want speed?** Raise `--max-concurrent`, or use `--no-details` to skip detail pages
+  entirely - that is the single biggest win, since detail fetching is one request per
+  article.
+- **Be polite.** The defaults (5 concurrent, 2s between pages, 0.5-1.5s jitter between
+  detail fetches) are already reasonable. Pushing much harder risks getting your IP
+  throttled.
 
-**Penggunaan:**
-```bash
-python run_crawl4ai.py
-```
+### About `config.py`
 
-**Konfigurasi:**
-```python
-scraper = MoneyControlCrawl4AIScraper(
-    fetch_details=True,     # Fetch dari detail page
-    max_concurrent=5        # Limit concurrent requests
-)
-```
+`config.py` exists but **nothing imports it**. The values in it are dead - editing
+`NUM_PAGES` or `DELAY_BETWEEN_PAGES` there has no effect on any scraper. It is a leftover
+from an earlier version. Use the CLI flags or the constructor arguments shown above.
 
 ---
 
-### 🎭 **Playwright Scraper**
+## Reliability Details
 
-**Keunggulan:**
-- Full browser automation
-- Reliable dan stabil
-- Async/await support
-- Debugging yang mudah
+The Crawl4AI scraper is built to survive a flaky site:
 
-**Penggunaan:**
-```bash
-python run_playwright.py
-```
+- **Retries:** each detail page gets 2 attempts with exponential backoff.
+- **Timeout:** 120 seconds per detail page.
+- **Concurrency cap:** an `asyncio.Semaphore` bounds in-flight detail requests, plus a
+  0.5-1.5s jitter after each one.
+- **Failure isolation:** `asyncio.gather(..., return_exceptions=True)` means one bad
+  article cannot kill the run - it is logged and left with empty fields.
+- **Selector fallbacks:** articles come in several layouts. Author falls back from
+  `<div class="article_author"><a>` to the div's own text; date falls back from
+  `<div class="article_schedule">` to `<p class="date">`; video-format articles fall back to
+  `<div class="video_content">`. Fields that still cannot be found end up empty rather than
+  raising.
 
----
-
-### 📡 **Requests Scraper** (Basic)
-
-**Keunggulan:**
-- Paling ringan dan cepat
-- Tidak perlu browser
-- Cocok untuk static content
-
-**Penggunaan:**
-```bash
-python run_requests.py
-```
+Because of those fallbacks, **empty `author` or `date` fields are normal**, not a bug. Check
+the log if a whole run comes back empty.
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
-### Error: Timeout
+| Symptom | Fix |
+|---------|-----|
+| `ModuleNotFoundError` | `pip install -r requirements.txt` |
+| `playwright._impl._api_types.Error: Executable doesn't exist` | `playwright install chromium` |
+| Timeouts on detail pages | `--max-concurrent 3 --delay 3.0` |
+| Zero articles scraped | Moneycontrol likely changed its HTML. See `extract_article_data()` and `docs/SCRAPING_GUIDE.md` |
+| MongoDB `ServerSelectionTimeoutError` | Server not running, or wrong `MONGODB_CONNECTION_STRING`. Atlas also needs your IP allowlisted |
+| `upload_to_mongodb.py` says file not found | `JSON_FILE_PATH` does not match your output filename - see the note above |
+| Duplicate key error on upload | Uploading non-Crawl4AI output. See the MongoDB warning above |
 
-Jika sering terjadi timeout:
+Logs are the first place to look. Each scraper writes its own file (see the table in
+[Usage](#the-other-three-scrapers)); the MongoDB script writes `mongodb_upload.log`.
 
-```python
-# Kurangi concurrent requests
-scraper = MoneyControlCrawl4AIScraper(max_concurrent=3)
-
-# Tambah delay antar page
-articles = await scraper.scrape_multiple_pages(num_pages=3, delay=3.0)
-```
-
-Baca: `docs/ERROR_HANDLING_GUIDE.md`
-
-### Error: UnicodeEncodeError (Windows)
-
-Sudah diperbaiki! Emoji diganti dengan text labels.
-
-### Error: Playwright browser tidak tersedia
-
-```bash
-playwright install chromium
-```
-
-### Error: Module not found
-
-```bash
-pip install -r requirements.txt --upgrade
-```
+`docs/ERROR_HANDLING_GUIDE.md` goes deeper on timeouts and rate limiting.
+`docs/SCRAPING_GUIDE.md` covers how to inspect the page and update selectors when the site
+changes.
 
 ---
 
-## 📖 Dokumentasi Lengkap
+## Extending
 
-- **`docs/SCRAPING_GUIDE.md`** - Panduan lengkap web scraping
-  - Konsep dasar & flow
-  - Cara inspect element
-  - CSS selector cheat sheet
-  - Template code berbagai use case
-  - Debugging tips
-
-- **`docs/ERROR_HANDLING_GUIDE.md`** - Troubleshooting guide
-  - Root cause analysis
-  - Concurrency limiting
-  - Retry mechanism
-  - Configuration options
-
-## 🎓 Examples
-
-### Custom Scraper untuk Website Lain
-
-```bash
-python examples/custom_scraper.py
-```
-
-Template yang bisa di-customize untuk scrape website apapun.
-
-### Berbagai Format JSON Output
-
-```bash
-python examples/json_output_examples.py
-```
-
-Generate 8 format JSON berbeda:
-- Standard (default)
-- Compact (space-efficient)
-- With metadata
-- Grouped by date
-- JSONL (JSON Lines)
-- Custom fields
-- API format
-
----
-
-## 🛠️ Development
-
-### Struktur Data
-
-Setiap artikel memiliki field:
-
-| Field | Deskripsi | Source |
-|-------|-----------|--------|
-| `title` | Judul berita | List page |
-| `url` | Link artikel lengkap | List page |
-| `hash` | **Unique identifier** (SHA256 dari title+date, base64 encoded) | Generated |
-| `summary` | Ringkasan/excerpt | List page |
-| `image_url` | URL gambar thumbnail | List page |
-| `date` | Tanggal publikasi | Detail page |
-| `author` | Nama penulis | Detail page |
-| `full_content` | Konten artikel lengkap (semua paragraf) | Detail page |
-| `scraped_at` | Timestamp scraping | Generated |
-
-### Import Sebagai Module
-
-```python
-from scrapers import MoneyControlCrawl4AIScraper
-
-# Initialize
-scraper = MoneyControlCrawl4AIScraper(
-    fetch_details=True,
-    max_concurrent=5
-)
-
-# Scrape
-articles = await scraper.scrape_multiple_pages(num_pages=3)
-
-# Save
-scraper.save_to_json(articles, 'my_output.json')
-scraper.save_to_csv(articles, 'my_output.csv')
-```
-
-### Menambah Field Baru
-
-Edit fungsi `extract_article_data()` di scraper:
+To capture a new field, edit `extract_article_data()` in the scraper you use:
 
 ```python
 def extract_article_data(self, article_element):
     # ... existing code ...
-
-    # Tambah field baru
     category_elem = article_element.find('span', class_='category')
     article_data['category'] = category_elem.get_text(strip=True) if category_elem else ''
-
     return article_data
 ```
 
----
+The `''` fallback matters - keep that pattern, since a missing element is normal here and
+should not raise.
 
-## ⚙️ Best Practices
+To add a category, add an entry to the `CATEGORIES` dict at the top of
+`scrapers/crawl4ai_scraper.py`. Argparse picks up the choices automatically.
 
-1. **Rate Limiting**: Gunakan delay minimal 2 detik antar request
-2. **Concurrency**: Set `max_concurrent=3-5` untuk stabilitas
-3. **Error Handling**: Check logs untuk troubleshooting
-4. **Respect ToS**: Gunakan data secara bertanggung jawab
-5. **Off-Peak Hours**: Scrape di jam sepi untuk performa lebih baik
+To point this at a different site entirely, start from `examples/custom_scraper.py`.
 
 ---
 
-## 📈 Performance Tips
+## Notes
 
-### Untuk Speed:
-```python
-# Increase concurrent (hati-hati!)
-scraper = MoneyControlCrawl4AIScraper(max_concurrent=8)
-```
-
-### Untuk Stability:
-```python
-# Decrease concurrent & add delay
-scraper = MoneyControlCrawl4AIScraper(max_concurrent=3)
-articles = await scraper.scrape_multiple_pages(num_pages=5, delay=3.0)
-```
-
-### Auto-Detect All Pages:
-```python
-from scrapers import EnhancedMoneyControlScraper
-
-scraper = EnhancedMoneyControlScraper()
-articles = await scraper.scrape_all_pages()  # Otomatis detect & scrape semua
-```
-
----
-
-## 🔐 Requirements
-
-- Python 3.8+
-- requests
-- beautifulsoup4
-- pandas
-- crawl4ai (untuk Crawl4AI scraper - RECOMMENDED)
-- playwright (untuk Playwright dan Crawl4AI scraper)
-
----
-
-## 📝 License
-
-MIT License
-
----
-
-## ⚠️ Disclaimer
-
-Tool ini dibuat untuk tujuan edukasi. Pastikan mematuhi terms of service website dan gunakan secara bertanggung jawab.
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! Silakan buat issue atau pull request.
-
----
-
-## 📞 Support
-
-Jika ada pertanyaan atau issue:
-1. Check `docs/` folder untuk dokumentasi
-2. Review logs untuk debugging
-3. Adjust configuration sesuai kebutuhan
-
----
-
-**Happy Scraping! 🚀**
+- Educational project. Respect Moneycontrol's terms of service and robots.txt, keep the
+  request rate modest, and do not redistribute scraped content.
+- `.env` is gitignored. Keep it that way - it holds your database credentials.
+- License: MIT.

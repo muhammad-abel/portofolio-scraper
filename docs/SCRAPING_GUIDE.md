@@ -1,186 +1,206 @@
-# 📖 Panduan Lengkap Web Scraping
+# Web Scraping Guide
 
-## 🎯 Konsep Dasar
+Background on how the scraping in this project works, and how to fix the selectors when
+Moneycontrol changes its HTML (it will, eventually).
 
-### 1. Cara Kerja Web Scraping (Simplified)
+---
+
+## How scraping works
 
 ```
-┌─────────────┐
-│   Website   │  ← 1. Kirim HTTP Request
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  HTML Code  │  ← 2. Terima HTML Response
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│ BeautifulSoup│ ← 3. Parse HTML menjadi Tree
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Find Elements│  ← 4. Cari element dengan selector
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│Extract Data │  ← 5. Ambil text/attribute
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Save Data  │  ← 6. Simpan ke JSON/CSV
-└─────────────┘
+   +-------------+
+   |   Website   |   1. Send an HTTP request
+   +------+------+
+          |
+          v
+   +-------------+
+   |  HTML Code  |   2. Receive the HTML response
+   +------+------+
+          |
+          v
+   +--------------+
+   | BeautifulSoup|  3. Parse the HTML into a tree
+   +------+-------+
+          |
+          v
+   +--------------+
+   | Find Elements|  4. Locate elements with selectors
+   +------+-------+
+          |
+          v
+   +--------------+
+   | Extract Data |  5. Pull out text / attributes
+   +------+-------+
+          |
+          v
+   +--------------+
+   |  Save Data   |  6. Write to JSON / CSV / MongoDB
+   +--------------+
 ```
 
-## 🔍 Cara Menemukan Data yang Anda Mau
+Steps 1 and 2 are where the scrapers differ. `requests_scraper` does a plain HTTP GET and
+gets whatever HTML the server sends. `playwright_scraper` and the Crawl4AI scrapers drive a
+real Chromium browser, so JavaScript runs and client-rendered content actually exists by the
+time you parse it. Steps 3-6 are identical everywhere - BeautifulSoup with `lxml`.
 
-### Step 1: Inspect Element di Browser
+---
 
-1. **Buka website** target di Chrome/Firefox
-2. **Klik kanan** pada elemen yang mau di-scrape
-3. **Pilih "Inspect"** atau tekan `F12`
-4. **Lihat HTML structure** di Developer Tools
+## The selectors this project uses
 
-**Contoh:**
-```
-Klik kanan pada judul berita → Inspect
+If a run suddenly returns zero articles, or every `author` comes back empty, one of these
+stopped matching. They live in `extract_article_data()` and `fetch_article_details()` in
+`scrapers/crawl4ai_scraper.py`.
 
-Anda akan lihat:
+**List page** (`https://www.moneycontrol.com/news/business/markets/page-N/`):
+
+| Data | Selector | Notes |
+|------|----------|-------|
+| Article container | `li.clearfix` | Falls back to `div.article`, `article`, then any `li` |
+| Link + title | `a.unified-link` (or first `a`), title from the `h2` inside it | |
+| Image | `img` inside the link | Tries `src`, then `data-src` (lazy loading), then `data` |
+| Summary | first `p` in the container | Sibling of the `a`, not inside it |
+
+**Detail page** (the individual article):
+
+| Data | Selector | Fallback |
+|------|----------|----------|
+| Author | `div.article_author > a` | The div's own text if there is no `<a>` |
+| Date | `div.article_schedule > span` | `p[class*=date]`, splitting off the time after `.` |
+| Full content | `div#contentdata.content_wrapper.arti-flow`, all `p` inside | `div.video_content > p.text_3` |
+| Date (video format) | - | `div.video_content > p.last_updated` |
+
+The video fallbacks exist because some Moneycontrol articles are video posts with a
+completely different layout. That is also why an empty `author` is common rather than a
+bug - video articles frequently have no byline at all.
+
+---
+
+## Finding the data you want
+
+### Step 1: Inspect the element
+
+1. Open the target page in Chrome or Firefox
+2. Right-click the element you want
+3. Choose **Inspect**, or press `F12`
+4. Read the HTML structure in DevTools
+
+For example, right-clicking a headline might reveal:
+
+```html
 <h2 class="article-title">
-  <a href="/news/123">Judul Berita Disini</a>
+  <a href="/news/123">The headline text</a>
 </h2>
 ```
 
-### Step 2: Identifikasi Pattern
+### Step 2: Identify the pattern
 
-Cari pola yang **konsisten** di semua item:
+Look for something **consistent** across every item.
 
-✅ **Container** - Element yang membungkus data
+A **container** wraps each record:
+
 ```html
-<div class="news-item">     ← Container
-  <h2>...</h2>               ← Judul
-  <span>...</span>           ← Tanggal
-  <p>...</p>                 ← Deskripsi
+<div class="news-item">    <- container
+  <h2>...</h2>             <- title
+  <span>...</span>         <- date
+  <p>...</p>               <- description
 </div>
 ```
 
-✅ **Identifier** - Class/ID yang unique
-- `class="news-item"` → untuk container
-- `class="article-title"` → untuk judul
-- `class="publish-date"` → untuk tanggal
+An **identifier** - a class or id - tells you what each piece is:
 
-### Step 3: Tulis Selector
+- `class="news-item"` -> the container
+- `class="article-title"` -> the title
+- `class="publish-date"` -> the date
 
-**BeautifulSoup Methods:**
+Prefer semantic-looking classes over generated ones. A class like `css-1x9fj2k` is a
+build artifact and will change on the site's next deploy.
+
+### Step 3: Write the selector
 
 ```python
-# 1. Find by TAG
-soup.find('h2')                    # Cari tag <h2> pertama
-soup.find_all('p')                 # Cari semua tag <p>
+# By tag
+soup.find('h2')                     # first <h2>
+soup.find_all('p')                  # every <p>
 
-# 2. Find by CLASS
+# By class
 soup.find('div', class_='news-item')
 soup.find_all('span', class_='date')
 
-# 3. Find by ID
+# By id
 soup.find('div', id='main-content')
 
-# 4. Find by ATTRIBUTE
+# By attribute
 soup.find('a', {'data-type': 'article'})
-soup.find('img', {'alt': 'news'})
 
-# 5. CSS Selector (Powerful!)
-soup.select('div.news-item')       # Tag dengan class
-soup.select('#main h2')            # h2 dalam element dengan ID main
-soup.select('h2 > a')              # a yang direct child dari h2
-soup.select('[data-type="news"]')  # Element dengan attribute
+# CSS selectors
+soup.select('div.news-item')        # tag with class
+soup.select('#main h2')             # h2 anywhere inside #main
+soup.select('h2 > a')               # a that is a direct child of h2
+soup.select('[data-type="news"]')   # by attribute
 ```
 
-## 📝 CSS Selector Cheat Sheet
+---
 
-| Selector | Contoh | Deskripsi |
-|----------|--------|-----------|
-| `.class` | `.news-item` | Element dengan class="news-item" |
-| `#id` | `#header` | Element dengan id="header" |
-| `tag` | `div` | Semua tag `<div>` |
-| `tag.class` | `div.article` | Tag div dengan class article |
-| `tag#id` | `div#main` | Tag div dengan id main |
-| `parent > child` | `div > p` | `<p>` yang direct child dari `<div>` |
-| `ancestor descendant` | `div p` | Semua `<p>` dalam `<div>` |
-| `[attribute]` | `[data-id]` | Element dengan attribute data-id |
-| `[attribute="value"]` | `[type="text"]` | Element dengan type="text" |
+## CSS selector cheat sheet
 
-## 🛠️ Template Code untuk Berbagai Kasus
+| Selector | Example | Matches |
+|----------|---------|---------|
+| `.class` | `.news-item` | Elements with `class="news-item"` |
+| `#id` | `#header` | The element with `id="header"` |
+| `tag` | `div` | Every `<div>` |
+| `tag.class` | `div.article` | `<div>` with class `article` |
+| `tag#id` | `div#main` | `<div>` with id `main` |
+| `parent > child` | `div > p` | `<p>` that is a direct child of a `<div>` |
+| `ancestor descendant` | `div p` | Every `<p>` anywhere inside a `<div>` |
+| `[attribute]` | `[data-id]` | Elements having a `data-id` attribute |
+| `[attribute="value"]` | `[type="text"]` | Elements with `type="text"` |
 
-### Kasus 1: Scrape News Articles
+---
+
+## Common patterns
+
+### News articles
 
 ```python
 from bs4 import BeautifulSoup
 import requests
 
-url = "https://example.com/news"
-response = requests.get(url)
+response = requests.get("https://example.com/news")
 soup = BeautifulSoup(response.content, 'lxml')
 
-# Cari semua artikel
-articles = soup.find_all('div', class_='article')  # Sesuaikan class
-
-for article in articles:
-    # Extract judul
-    title_elem = article.find('h2')  # atau h1, h3
+for article in soup.find_all('div', class_='article'):
+    title_elem = article.find('h2')
     title = title_elem.get_text(strip=True) if title_elem else ''
 
-    # Extract link
     link_elem = article.find('a')
     link = link_elem.get('href', '') if link_elem else ''
 
-    # Extract tanggal
-    date_elem = article.find('span', class_='date')  # Sesuaikan class
+    date_elem = article.find('span', class_='date')
     date = date_elem.get_text(strip=True) if date_elem else ''
 
-    # Extract deskripsi
-    desc_elem = article.find('p')
-    desc = desc_elem.get_text(strip=True) if desc_elem else ''
-
-    print(f"{title} - {date}")
-    print(f"Link: {link}")
-    print(f"Desc: {desc[:100]}...\n")
+    print(f"{title} - {date}\n{link}\n")
 ```
 
-### Kasus 2: Scrape Product Listings (E-commerce)
+### Product listings
 
 ```python
-products = soup.find_all('div', class_='product-card')
-
-for product in products:
-    # Nama produk
+for product in soup.find_all('div', class_='product-card'):
     name = product.find('h3', class_='product-name').get_text(strip=True)
-
-    # Harga
     price = product.find('span', class_='price').get_text(strip=True)
 
-    # Rating
     rating_elem = product.find('div', class_='rating')
     rating = rating_elem.get('data-rating', '') if rating_elem else ''
 
-    # Gambar
-    img = product.find('img')
-    img_url = img.get('src', '') if img else ''
-
-    print(f"{name} - {price} - Rating: {rating}")
+    print(f"{name} - {price} - {rating}")
 ```
 
-### Kasus 3: Scrape Table Data
+### Tables
 
 ```python
 table = soup.find('table', class_='data-table')
-rows = table.find_all('tr')
 
 data = []
-for row in rows[1:]:  # Skip header row
+for row in table.find_all('tr')[1:]:  # skip the header row
     cols = row.find_all('td')
     if len(cols) >= 3:
         data.append({
@@ -188,151 +208,97 @@ for row in rows[1:]:  # Skip header row
             'col2': cols[1].get_text(strip=True),
             'col3': cols[2].get_text(strip=True),
         })
-
-print(data)
 ```
 
-### Kasus 4: Scrape dengan Pagination
+### Pagination
 
 ```python
-base_url = "https://example.com/news"
-all_data = []
+import time
 
-for page in range(1, 6):  # Scrape 5 halaman
-    url = f"{base_url}/page-{page}"
-    response = requests.get(url)
+all_data = []
+for page in range(1, 6):
+    response = requests.get(f"https://example.com/news/page-{page}")
     soup = BeautifulSoup(response.content, 'lxml')
 
-    articles = soup.find_all('div', class_='article')
-    for article in articles:
-        # Extract data...
-        all_data.append(data)
+    for article in soup.find_all('div', class_='article'):
+        all_data.append(extract(article))
 
-    # Delay untuk menghindari blocking
-    import time
-    time.sleep(2)
+    time.sleep(2)  # be polite
 ```
 
-## 🐛 Debugging Tips
+This is exactly the shape of `scrape_multiple_pages()` - Moneycontrol paginates as
+`page-1/`, `page-2/`, and so on, which is why the URL can just be built by string
+formatting.
 
-### 1. Print HTML untuk Lihat Struktur
+---
+
+## Debugging
+
+### Print the structure
 
 ```python
-# Print HTML dari element
-print(article_elem.prettify())
-
-# Print semua class yang ada
-print(article_elem.get('class'))
-
-# Print semua attribute
-print(article_elem.attrs)
+print(article_elem.prettify())   # the element's HTML
+print(article_elem.get('class')) # its classes
+print(article_elem.attrs)        # every attribute
 ```
 
-### 2. Check Apakah Element Ada
+### Always check before extracting
 
 ```python
-# ❌ BAD - akan error jika None
+# BAD - AttributeError the moment the element is missing
 title = article.find('h2').get_text()
 
-# ✅ GOOD - aman dari error
+# GOOD
 title_elem = article.find('h2')
-if title_elem:
-    title = title_elem.get_text(strip=True)
-else:
-    print("Title element not found!")
-    title = ''
+title = title_elem.get_text(strip=True) if title_elem else ''
 ```
 
-### 3. Test Selector di Browser Console
+This is the single most common scraping bug, and it is why every extraction in this project
+uses the `if elem else ''` pattern. Missing elements are normal, not exceptional.
 
-Di Developer Tools → Console, test selector:
+### Test selectors in the browser console
+
+DevTools -> Console:
 
 ```javascript
-// Test CSS selector
-document.querySelectorAll('div.article')
-
-// Lihat isi element
-document.querySelector('h2.title').textContent
+document.querySelectorAll('div.article')          // how many match?
+document.querySelector('h2.title').textContent    // what is inside?
 ```
 
-## 🎓 Latihan Praktis
+This is far faster than re-running the scraper to test a guess.
 
-### Latihan 1: Inspect dan Tulis Selector
+---
 
-1. Buka https://news.ycombinator.com
-2. Inspect judul berita
-3. Tulis kode untuk extract semua judul
+## Common errors
 
-**Jawaban:**
-```python
-response = requests.get('https://news.ycombinator.com')
-soup = BeautifulSoup(response.content, 'lxml')
+### `AttributeError: 'NoneType' object has no attribute 'get_text'`
 
-titles = soup.select('span.titleline > a')
-for title in titles:
-    print(title.get_text())
-```
-
-### Latihan 2: Handle Missing Data
-
-Website kadang punya element yang tidak lengkap. Handle dengan proper!
+The element was not found, so `find()` returned `None`. Guard it:
 
 ```python
-def safe_extract(element, selector, attr=None):
-    """Safely extract data with fallback"""
-    found = element.find(selector) if isinstance(selector, str) else selector
-    if not found:
-        return ''
-    if attr:
-        return found.get(attr, '')
-    return found.get_text(strip=True)
-
-# Gunakan:
-title = safe_extract(article, 'h2')
-link = safe_extract(article.find('a'), None, 'href')
-```
-
-## ⚠️ Common Errors & Solutions
-
-### Error 1: AttributeError: 'NoneType' object has no attribute 'get_text'
-
-**Penyebab:** Element tidak ditemukan (None)
-
-**Solusi:**
-```python
-# Selalu check sebelum extract
 elem = soup.find('h2')
-if elem:
-    text = elem.get_text()
-else:
-    text = ''
+text = elem.get_text() if elem else ''
 ```
 
-### Error 2: Tidak Ada Data yang Ke-scrape
+### Nothing gets scraped
 
-**Penyebab:**
-- Selector salah
-- Website pakai JavaScript rendering
+Either the selector is wrong or the site renders with JavaScript. Diagnose:
 
-**Solusi:**
 ```python
-# 1. Print untuk debug
 containers = soup.find_all('div', class_='article')
 print(f"Found {len(containers)} containers")
-if len(containers) == 0:
-    print("Selector mungkin salah!")
-    print(soup.prettify()[:1000])  # Print HTML
-
-# 2. Gunakan Playwright/Crawl4AI untuk JavaScript site
+if not containers:
+    print(soup.prettify()[:1000])  # what did we actually get?
 ```
 
-### Error 3: Data Tidak Lengkap
+If the HTML looks like an empty shell, the content is JavaScript-rendered - use the
+Crawl4AI or Playwright scraper rather than `requests`.
 
-**Penyebab:** Struktur HTML berbeda antar item
+### Some fields are empty
 
-**Solusi:** Gunakan multiple fallback selector
+The HTML structure varies between items. Chain fallbacks:
+
 ```python
-# Try multiple selectors
 date_elem = (
     article.find('span', class_='date') or
     article.find('time') or
@@ -340,20 +306,32 @@ date_elem = (
 )
 ```
 
-## 🚀 Next Steps
-
-1. **Praktek** dengan website sederhana dulu
-2. **Inspect** struktur HTML dengan baik
-3. **Test** selector di Python console/Jupyter notebook
-4. **Handle** error dengan proper checking
-5. **Respect** robots.txt dan rate limiting
-
-## 📚 Resources
-
-- BeautifulSoup Docs: https://www.crummy.com/software/BeautifulSoup/bs4/doc/
-- CSS Selector Reference: https://www.w3schools.com/cssref/css_selectors.asp
-- Regex for cleaning: https://regex101.com/
+That `or` chain is the pattern used throughout this project's extractors.
 
 ---
 
-**Pro Tip:** Selalu test scraper Anda dengan 1 halaman dulu sebelum scale up!
+## Practice
+
+Open https://news.ycombinator.com, inspect a headline, and try to extract all of them:
+
+```python
+response = requests.get('https://news.ycombinator.com')
+soup = BeautifulSoup(response.content, 'lxml')
+
+for title in soup.select('span.titleline > a'):
+    print(title.get_text())
+```
+
+Static HTML, clean markup, no JavaScript required - a good first target.
+
+---
+
+## Resources
+
+- BeautifulSoup docs: https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+- CSS selector reference: https://www.w3schools.com/cssref/css_selectors.asp
+- Regex tester (for cleaning extracted text): https://regex101.com/
+
+---
+
+Test against a single page before scaling up. Respect `robots.txt` and rate limits.
