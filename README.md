@@ -1,4 +1,4 @@
-# Moneycontrol News Scraper
+# Portfolio Web Scrapers
 
 Scrapes news articles from Moneycontrol.com (https://www.moneycontrol.com/news/business/)
 and exports them to JSON, CSV, or MongoDB.

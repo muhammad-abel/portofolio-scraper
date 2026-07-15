@@ -24,7 +24,7 @@ from urllib.parse import urljoin
 # Category to URL mapping
 CATEGORIES = {
     'markets': 'https://www.moneycontrol.com/news/business/markets/',
-    'world': 'https://www.moneycontrol.com/news/business/world/',
+    'world': 'https://www.moneycontrol.com/world/',
     'stocks': 'https://www.moneycontrol.com/news/business/stocks/',
     'economy': 'https://www.moneycontrol.com/news/business/economy/'
 }
